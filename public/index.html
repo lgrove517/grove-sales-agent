@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Sales Agent Command Center</title>
+<title>AI Sales Agent | Webtech Design</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
 <style>
@@ -48,6 +48,23 @@
     font-size: 28px;
     margin: 0;
     color: var(--gold);
+  }
+  header h1 .by {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-style: normal;
+    font-size: 15px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cream);
+    opacity: 0.8;
+    margin-left: 6px;
+  }
+  footer.product {
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    opacity: 0.6;
+    padding: 24px 16px 32px;
   }
   header .status {
     font-size: 13px;
@@ -138,7 +155,7 @@
 </head>
 <body>
 <header>
-  <h1>Sales Agent Command Center</h1>
+  <h1>AI Sales Agent <span class="by">by Webtech Design</span></h1>
   <span class="status" id="status">Checking connection...</span>
   <span class="spacer"></span>
   <a class="logout" href="/logout">Sign out</a>
@@ -164,6 +181,8 @@
   </section>
 </main>
 
+<footer class="product">AI Sales Agent is a product of Webtech Design LLC</footer>
+
 <script>
   const logEl = document.getElementById('log');
   const statusEl = document.getElementById('status');
@@ -178,8 +197,8 @@
         '<span class="dot ' + (data.anthropicConfigured ? 'on' : 'off') + '"></span>Claude: ' +
         (data.anthropicConfigured ? 'live' : 'dry-run') +
         '  &nbsp; <span class="dot ' + (data.ghlConfigured ? 'on' : 'off') + '"></span>GoHighLevel: ' +
-        (data.ghlConfigured ? (data.ghlSendMode === 'live' ? 'live (sending)' : 'connected (review mode - nothing sends)') : 'dry-run') +
-        '  &nbsp; brand: ' + data.defaultBrain;
+        (data.ghlConfigured ? (data.ghlSendMode === 'live' ? 'live (sending)' : 'connected (review mode: drafts only, nothing is sent)') : 'dry-run') +
+        '  &nbsp; Client: ' + escapeHtml(data.clientName || data.defaultBrain);
     } catch {
       statusEl.textContent = 'Cannot reach server.';
     }
