@@ -113,6 +113,7 @@ app.get('/health', (req, res) => {
     ghlConfigured: ghl.isConfigured(),
     ghlSendMode: ghl.sendMode(),
     defaultBrain: process.env.DEFAULT_BRAIN || 'grove-financial',
+    clientName: (() => { try { return loadBrain().businessName; } catch { return null; } })(),
   });
 });
 
