@@ -1,0 +1,212 @@
+{
+  "_comment": "Working example brain for Grove Financial Group Inc. - demonstrates the system with a real client. Still needs a CAN-SPAM-compliant mailing address for email footers before this goes live (Dr. Grove's home address is intentionally kept private).",
+  "clientId": "grove-financial",
+  "businessName": "Grove Financial Group Inc.",
+  "industry": "Financial services - retirement planning, insurance, investment advisory",
+  "website": "https://grovefinancialgroupinc.com",
+  "phone": "(251) 206-7074",
+  "bookingLink": "https://api.leadconnectorhq.com/widget/bookings/compliementary-financial-planning",
+  "mailingAddress": {
+    "value": "Grove Financial Group Inc., Mobile, AL 36618",
+    "status": "INTERIM. Dr. Grove provided city/state/zip only (Sep 18 2026) as a placeholder that keeps his home street address off outbound email, per his standing preference. CAN-SPAM's 'valid physical postal address' requirement is generally read to need a street address, a USPS-registered PO Box, or a registered private mailbox - city+state+zip alone is a reasonable interim placeholder but likely does not fully satisfy that requirement on its own. If Dr. Grove wants to keep his home address private long-term, a PO Box would resolve this cleanly. Until then, this is the best available value and is better than omitting a mailing address entirely."
+  },
+  "marketingApproach": "Sep 17 2026 direction from Dr. Grove, confirmed with Gradient Advisors: market from Grove Financial Group (the insurance entity) and lead with State Insurance law compliance, not the Investment Advisor Representative disclosure. The goal of any first-touch or marketing message is simply to get a prospect talking with Dr. Grove through Grove Financial Group - not to pitch a specific product line up front. Which specific offer fits (insurance, Medicare, CD alternative, business planning, or investment advisory) is discovered in that conversation, not decided by the agent beforehand. Practical effect: the leadQualifier and contentDrafter agents should keep first-touch messages general ('let's talk about your financial picture' / 'happy to see how Grove Financial Group can help'), not lead with 'Retirement Plan Review' or 'Investment Advisory' by name, unless the lead themselves already named that specific interest. Oct 2026 update from Dr. Grove: retirement messaging on the Grove Financial Group side leads with income questions, not investment products - see messagingThemes. 401(k)s, rollovers, pensions, IRAs, business retirement plans and fiduciary services belong to Grove Wealth Management (Gradient Advisors); a Grove Financial Group message never raises them. When a lead raises them, the agent does not answer - it routes the lead to Dr. Grove (enforced in code: complianceGuard.detectInvestmentTopic).",
+  "voice": {
+    "tone": "Warm, credible, unhurried. Leads with expertise (ChFC, RICP, 29 years experience, Marine Corps veteran) without being salesy. Speaks to Gulf Coast individuals and business owners like a trusted advisor, not a call-center script. First-touch messages open a conversation about their financial picture broadly - they do not pitch a specific product (see marketingApproach).",
+    "readingLevel": "8th-9th grade",
+    "signOffName": "Dr. Leon Grove, ChFC, RICP - Grove Financial Group",
+    "bannedPhrases": [
+      "guaranteed returns",
+      "risk-free",
+      "act now",
+      "limited time offer",
+      "circle back"
+    ]
+  },
+  "idealCustomerProfile": {
+    "description": "Five priority segments, per the Sep 2026 market demographics research: (1) life insurance/Medicare prospects age 60-75 in the licensed states, especially FL, AZ, and SC; (2) certificate of deposit holders (conservative savers, skew 55+ and higher income) who may be better served by an annuity or IUL; (3) mass-affluent individuals, including those under 50, with $250k+ investable assets who are 'less advised' and open to a first relationship; (4) small profitable business owners in FL and NC especially, for buy-sell and key-person conversations (business retirement-plan questions route to Grove Wealth Management via Dr. Grove); (5) international English-speaking $250k+ prospects in Dubai/select European countries - lowest priority and relationship-only until carrier and licensing questions are resolved (see guardrails).",
+    "goodFitSignals": [
+      "Mentions retirement income, annuities, life insurance, IUL, or Medicare (if they mention a pension, 401(k), IRA or rollover, that is still a good fit - but route it to Dr. Grove for Grove Wealth Management, do not reply)",
+      "Mentions holding CDs, or being a conservative/safety-focused saver looking for better tax or income treatment",
+      "Business owner asking about a buy-sell agreement or key-person coverage (questions about their company retirement plan route to Dr. Grove)",
+      "Located in Alabama, Florida, South Carolina, North Carolina, or Arizona (insurance-licensed states) or Mississippi/Florida/Alabama (securities-registered states)",
+      "Mentions $250k+ in investable assets or being unhappy with their current level of advice, regardless of age"
+    ],
+    "disqualifyingSignals": [
+      "Explicitly says they are not interested",
+      "Asks to be removed / opts out",
+      "Requests a specific investment recommendation, trade, or account action (route to Dr. Grove directly - not something the agent should answer)"
+    ]
+  },
+  "offers": [
+    {
+      "name": "Grove Financial Group - General Conversation",
+      "description": "The default front door for any new lead: an invitation to talk with Dr. Grove about their financial picture. Not a specific product pitch - the fit (below) is discovered in conversation.",
+      "cta": "Schedule a conversation with Dr. Grove"
+    },
+    {
+      "name": "Retirement Income Conversation",
+      "description": "A free, no-cost conversation about whether someone's savings are creating the income they'll need in retirement - their 'income number' in monthly terms. Lead with the messagingThemes questions. Never name 401(k)s, rollovers, pensions, IRAs or plan fees in this offer - those are Grove Wealth Management topics.",
+      "cta": "Book a free 15-minute call"
+    },
+    {
+      "name": "Life Insurance / IUL / Annuities",
+      "description": "Insurance-licensed guidance in AL, FL, SC, NC, and AZ only.",
+      "cta": "Schedule a consultation"
+    },
+    {
+      "name": "Medicare Planning",
+      "description": "Help understanding Medicare options and timing.",
+      "cta": "Schedule a consultation"
+    },
+    {
+      "name": "Investment Advisory - Grove Wealth Management (via Gradient Advisors LLC)",
+      "description": "Securities/advisory business (including 401(k), rollover, pension, IRA and business retirement-plan conversations) registered in Mississippi, Florida, and Alabama only. Agents never offer, describe or reply about this - any lead whose need is investment-related is routed to Dr. Grove, who handles it personally under Grove Wealth Management with the proper disclosures.",
+      "cta": "Schedule a consultation"
+    }
+  ],
+  "valueProps": [
+    "29 years in financial services (since 1997), ChFC and RICP designations",
+    "14-year Marine Corps veteran - disciplined, mission-focused approach",
+    "Former college finance professor - explains things plainly, not in jargon",
+    "Local to the Gulf Coast, meets by appointment"
+  ],
+  "objectionHandling": {
+    "\"I need to think about it\"": "Acknowledge, ask what specifically they want to think through, offer to send the one-page retirement-income overview.",
+    "\"I already have an advisor\"": "Respect it, offer a no-pressure second-opinion conversation about their retirement income, no pressure to switch.",
+    "\"Is this free?\"": "Yes - the initial conversation with Dr. Grove is free and no-obligation."
+  },
+  "guardrails": {
+    "neverSay": [
+      "Any guaranteed rate of return, guaranteed income amount, or guaranteed outcome",
+      "Specific investment, trade, or product recommendation - that requires Dr. Grove directly",
+      "Tax or legal advice",
+      "Anything implying insurance licensing in Mississippi (not licensed there) or securities registration outside Mississippi, Florida, and Alabama",
+      "Any title other than one on guardrails.approvedTitles, or any professional designation other than one on guardrails.approvedDesignations",
+      "Any designation or phrase implying specific expertise in senior investments or senior retirement (Gradient Advisors prohibits this even though 'Retirement Specialist' is an approved TITLE) - keep retirement-review messaging about the offer, not an implied specialist credential",
+      "Any solicitation of a resident of a state where Dr. Grove is not registered/licensed, or of a non-US resident, without human review first",
+      "The Gradient Advisors name, 'investment advisory,' or any reference to securities/advisory services in an auto-sent message on ANY channel - this system never auto-sends advisory content at all (see manualSendRequirement)",
+      "Any mention of 401(k)s, 403(b)s, rollovers, pensions, lump sums, IRAs, business retirement plans, portfolios or fiduciary services in a Grove Financial Group message - those topics belong to Grove Wealth Management and are handled by Dr. Grove personally"
+    ],
+    "escalateToHumanIf": [
+      "Lead mentions a 401(k), 403(b), rollover, pension or lump-sum decision, IRA, business retirement plan, or other investment topic - mark needs_human, tag gwm-investment-inquiry, draft nothing for auto-send",
+      "Lead is located in a state outside the licensed/registered list above - confirm licensing before proceeding, do not auto-disqualify or auto-book",
+      "Lead is located outside the United States (e.g. Dubai or Europe) - per the Sep 2026 market research, non-resident/foreign-national sales require carrier-specific underwriting (commonly $5M+ net worth, US financial nexus, in-person US application) that this brain is not authorized to assume; treat as relationship-building only, never auto-qualify or auto-book",
+      "Lead's need turns out to be investment/advisory in nature, on any channel - never auto-send that content; draft it and hand it to Dr. Grove to review, send personally, and log for Gradient (see manualSendRequirement)",
+      "Lead mentions a complaint, legal threat, or regulator",
+      "Lead asks for a specific investment recommendation or account action",
+      "Lead requests to opt out or be removed from contact"
+    ],
+    "manualSendRequirement": "Confirmed Sep 17 2026 by Dr. Grove, two stacked rules: (1) GoHighLevel is NOT an approved SMS vendor for investment-related material, so advisory content can never go over SMS at all. (2) Separately and more broadly, Gradient wants documentation that the advisory disclosure was actually sent, and that record has to come from Dr. Grove sending it personally - not an automated system. He sends it through Gradient's own platform, which delivers the disclosure form to the client and records that it was sent - that platform IS the documentation, so this system does not need its own send-log or 'mark as sent' feature for this. Consequence: on EVERY channel (not just SMS), this system drafts advisory-flavored content but never auto-sends it. It always stops and hands the draft to Dr. Grove, who takes it from there through Gradient's platform. Enforced in code, not just by prompt, in src/config/complianceGuard.js (checkAdvisoryAutoSend), wired into followUp.js and appointmentSetter.js - it scans generated message text for advisory/securities keywords and blocks the send regardless of channel before it ever reaches ghl.sendMessage.",
+    "advisoryDisclosure": {
+      "appliesWhen": "Only when a specific communication discusses or solicits Investment Advisory services through Gradient Advisors - NOT on general Grove Financial Group insurance-side marketing or first-touch outreach (per marketingApproach, confirmed with Gradient Sep 17 2026 that leading with State Insurance law compliance is the simpler default path).",
+      "email": "Leon Grove offers investment advisory services through Gradient Advisors, LLC (Arden Hills, MN 877-885-0508), an SEC Registered Investment Advisor. Gradient Advisors, LLC and its advisors do not render tax, legal or accounting advice. Grove Financial Group Inc. is not a registered investment advisor and is independent of Gradient Advisors, LLC. Insurance products and services are offered through Leon Grove, independent agent.\n\nThis communication may contain information that is proprietary, privileged, or confidential, or otherwise legally exempt from disclosure. If you are not the named addressee, you are not authorized to read, retain, copy, or disseminate this message or any part of it. If you have received this message in error, please notify the sender immediately and destroy all copies of this communication. Please be further advised that, pursuant to the Bank Secrecy Act, the USA PATRIOT Act, and similar laws, any communication in this message is subject to regulatory, supervisory, and law enforcement review.\n\nGrove Financial Group Inc., Leon Grove, and Gradient Advisors, LLC are not affiliated with or endorsed by the Social Security Administration or any government agency.",
+      "website": "Leon Grove offers Investment Advisory Services through Gradient Advisors, LLC (Arden Hills, MN 877-885-0508), an SEC Registered Investment Advisor. Gradient Advisors, LLC and its advisors do not render tax, legal, or accounting advice. Grove Financial Group Inc. is not a registered investment advisor and is independent of Gradient Advisors, LLC. Insurance products and services are offered through Leon Grove, independent agent.\n\nGrove Financial Group Inc., Leon Grove, and Gradient Advisors, LLC are not affiliated with or endorsed by the Social Security Administration or any government agency.\n\nAll written content on this site is for information purposes only. Opinions expressed herein are solely those of Leon Grove and our editorial staff.\n\nThe presence of this website shall in no way be construed or interpreted as a solicitation to sell or offer to sell investment advisory services to any residents of any State other than the State(s) Leon Grove is registered or where otherwise legally permitted. Material presented is believed to be from reliable sources; however, we make no representations as to its accuracy or completeness. All information and ideas should be discussed in detail with your individual adviser prior to implementation.",
+      "printOrBusinessCard": "Leon Grove offers investment advisory services through Gradient Advisors, LLC (Arden Hills, MN 877-885-0508), an SEC Registered Investment Advisor. Gradient Advisors, LLC and its advisors do not render tax, legal or accounting advice. Grove Financial Group Inc. is not a registered investment advisor and is independent of Gradient Advisors, LLC. Insurance products and services are offered through Leon Grove, independent agent.",
+      "notes": "Verbatim from Gradient Advisors' IAR General Disclosures (Ver. 11/21), ADVISOR NAME=Leon Grove, ADVISOR COMPANY NAME=Grove Financial Group Inc. Print/business-card/website versions must also carry Dr. Grove's IAR address, telephone, and a GA-approved email address (not yet on file here - add before use). The CAN-SPAM mailing address for general email now has an interim value - see the top-level mailingAddress field for its current status.",
+      "openQuestion": "Oct 2026: Dr. Grove's current Gradient-approved materials (e.g. 861215, 278030, 976713) read 'Grove Wealth Management is not a registered investment advisor', while the disclosure text above (Ver. 11/21) names Grove Financial Group Inc. Confirm with Gradient which entity name the current disclosure should carry before using it."
+    },
+    "approvedTitles": [
+      "Financial Advisor, Gradient Advisors, LLC",
+      "Investment Advisor Representative, Gradient Advisors, LLC",
+      "Financial Planner, Gradient Advisors, LLC",
+      "Investment Consultant, Gradient Advisors, LLC",
+      "Wealth Manager",
+      "Financial Consultant",
+      "Retirement Specialist",
+      "President",
+      "Founder",
+      "CEO"
+    ],
+    "approvedDesignations": [
+      "ADPA",
+      "AIF",
+      "AWMA",
+      "AAMS",
+      "AEP",
+      "CEPA",
+      "CFA",
+      "CFF",
+      "CFP",
+      "CFS",
+      "ChFC",
+      "CIC",
+      "CLTC",
+      "CLU",
+      "CRC",
+      "CRPC",
+      "CRPS",
+      "CRTP",
+      "FMLI",
+      "FRC",
+      "JD",
+      "LUTCF",
+      "MBA",
+      "MAFM",
+      "MSFS",
+      "MSM",
+      "PFS",
+      "RFC",
+      "RICP",
+      "WMCP"
+    ],
+    "referenceDisclosures": {
+      "riskDisclosure": "Products offered through Gradient Advisors, LLC or our third-party money managers are not insured by the FDIC or any government agency. They are not deposits or obligations of, nor guaranteed by, any financial institution and are subject to investment risk, including possible loss of the principal amount invested. Investment returns are not guaranteed, and past performance does not guarantee future results.",
+      "fixedIndexedAnnuities": "Guarantees are based on the claims paying ability of the insurance company. Fixed Indexed Annuities do not participate directly in any stock or equity investments. Fixed Indexed Annuities are long-term investments. The IRS may also impose a 10% penalty on withdrawals prior to age 59 1/2, depending on the circumstances.",
+      "notes": "Append riskDisclosure whenever content discusses Gradient/advisory investment products; append fixedIndexedAnnuities whenever content discusses annuities specifically. Verbatim from the Gradient Advisors IAR General Disclosures (Ver. 11/21)."
+    },
+    "stateInsuranceDisclosure": {
+      "status": "SOURCED Sep 18 2026 via each state's own insurance-department administrative code (public regulation text, not a Gradient/carrier document - separate from guardrails.advisoryDisclosure above, which only governs investment-advisory content through Gradient). Confirmed directly, by citation, for AL/AZ/SC; FL and NC almost certainly carry the same core NAIC-model producer-identification requirement (their advertising chapters are titled/structured the same way) but the exact clause text could not be pulled from public mirrors during this research - worth a two-minute confirmation with Dr. Grove's FMO/carrier compliance contact before treating FL/NC as identical to AL/AZ/SC.",
+      "producerIdentificationRule": "Before actually commencing a life insurance (including IUL, annuity, or Medicare product) sales presentation - not required during general first-touch outreach that hasn't turned into a specific-product conversation yet, per marketingApproach - Dr. Grove (or a draft written on his behalf) must state: (1) that he is acting as a licensed insurance producer/agent, and (2) the full name of the insurance company he is representing for that specific product. Confirmed by citation: Alabama (Ala. Admin. Code ch. 482-1-131, Life Insurance Disclosure Regulation), Arizona (Ariz. Admin. Code R20-6-209(D)(2), Life Insurance Solicitation), South Carolina (S.C. Code Regs. 69-30, Life Insurance Disclosure Regulation). Florida's parallel chapter is 69B-150 (Life and Health Advertising Requirements) and North Carolina's is 11 NCAC 12 .0427 (titled 'Life Insurance Advertising: Disclosure Requirements') - both almost certainly impose the same producer/company-identification requirement, but confirm the exact text with compliance before relying on it verbatim for those two states.",
+      "generalAdvertisingStandard": "All five states prohibit insurance advertising that is untrue, misleading, or deceptive, or that implies a guaranteed return/outcome that isn't actually guaranteed - this matches guardrails.neverSay already in place, so no separate agent instruction is needed beyond what's already enforced. Two states also make clear that responsibility for agent-created advertising doesn't stop with the agent: North Carolina's DOI Agent Advertising Guidelines state the insurer is responsible for all advertising 'regardless of by whom written, created, designed or presented,' and South Carolina requires insurers to file an annual Certificate of Compliance covering ads used that year (S.C. Code Regs. 69-17). Practical effect: a one-to-one reply to a single lead is fine to send as drafted, but anything meant for repeated/mass use (a template, a landing page, an ad) should get a quick look from Dr. Grove or the carrier before wide use, not just before the first send.",
+      "medicareMarketingDisclaimer": "Separate FEDERAL requirement (CMS Medicare Communications and Marketing Guidelines, the 'TPMO rule') that applies whenever Medicare Advantage, Medicare Part D, or Medicare Supplement/Medigap plans are actually named or discussed, regardless of which state the lead is in. Required disclaimer text: \"We do not offer every plan available in your area. Any information we provide is limited to those plans we do offer in your area. Please contact Medicare.gov or 1-800-MEDICARE to get information on all of your options.\" (A longer version exists for when exact carrier/plan counts are known, but the above is the CMS-approved simplified version and is safe to use as-is.) Enforced in code as well as prompt: src/config/complianceGuard.js (ensureMedicareDisclaimer) automatically appends this exact text to any drafted message that names a specific Medicare plan type and doesn't already include it, before the message is checked for send-eligibility.",
+      "notes": "Researched Sep 18 2026 directly from each state insurance department's public administrative code (Alabama DOI, Arizona DIFI, Florida CFO/DFS, South Carolina DOI, North Carolina DOI) plus CMS's public Medicare marketing guidance - not yet reviewed by Dr. Grove's own FMO or carrier compliance contact. Two follow-ups worth doing before this governs real outbound insurance marketing at scale: (1) confirm the exact FL and NC disclosure clause text (see status above); (2) ask Dr. Grove's carriers whether any of them impose additional advertising pre-approval requirements on top of these state minimums."
+    }
+  },
+  "agents": {
+    "leadQualifier": {
+      "enabled": true
+    },
+    "followUp": {
+      "enabled": true,
+      "maxAttempts": 4,
+      "cadenceDays": [
+        1,
+        3,
+        7,
+        14
+      ]
+    },
+    "appointmentSetter": {
+      "enabled": true
+    },
+    "contentDrafter": {
+      "enabled": true
+    }
+  },
+  "approvedFacts": [
+    {
+      "fact": "Someone turning 65 today has almost a 70% chance of needing some type of long-term services and supports in their remaining years.",
+      "source": "Administration for Community Living (acl.gov/ltc/basic-needs/how-much-care-will-you-need)"
+    },
+    {
+      "fact": "48% of people who reach 65 receive some paid long-term care during their lifetime.",
+      "source": "HHS/ASPE, 2019"
+    },
+    {
+      "fact": "2025 U.S. national annual medians: $80,080 for a non-medical in-home caregiver, $74,400 for assisted living, $114,975 for a semi-private nursing-home room, $129,575 for a private room.",
+      "source": "CareScout Cost of Care Survey 2025, published March 2026"
+    },
+    {
+      "fact": "Medicare generally does not pay for most custodial long-term care.",
+      "source": "Medicare.gov"
+    }
+  ],
+  "messagingThemes": {
+    "retirementIncome": [
+      "Are all your savings creating the income you need in retirement?",
+      "Do you know your income number?"
+    ],
+    "notes": "Dr. Grove's preferred openers for retirement conversations (Oct 2026). Use them as questions that invite a conversation - never follow them with a product, investment, or plan-type pitch."
+  }
+}

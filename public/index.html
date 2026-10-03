@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sales Agent Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --forest: #1A3A2E;
+    --gold: #C9A84C;
+    --teal: #0F5F5C;
+    --cream: #F5EDD8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--forest);
+    font-family: 'Barlow Condensed', sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    background: var(--forest);
+    color: var(--cream);
+    padding: 20px 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  header .spacer { flex: 1; }
+  header a.logout {
+    color: var(--cream);
+    opacity: 0.75;
+    font-size: 13px;
+    text-decoration: none;
+    border: 1px solid rgba(245,237,216,0.4);
+    border-radius: 6px;
+    padding: 4px 10px;
+  }
+  header a.logout:hover { opacity: 1; }
+  header h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500;
+    font-style: italic;
+    font-size: 28px;
+    margin: 0;
+    color: var(--gold);
+  }
+  header .status {
+    font-size: 13px;
+    opacity: 0.85;
+    letter-spacing: 0.02em;
+  }
+  .status .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .dot.on { background: #6fbf73; }
+  .dot.off { background: #c96b4c; }
+
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  @media (min-width: 760px) {
+    main { grid-template-columns: 1.3fr 1fr; }
+  }
+
+  .card {
+    background: white;
+    border: 1px solid rgba(26,58,46,0.12);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .card h2 {
+    font-size: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--teal);
+    margin: 0 0 12px;
+  }
+
+  .command-form { display: flex; gap: 8px; }
+  .command-form input {
+    flex: 1;
+    padding: 12px 14px;
+    font-size: 16px;
+    border: 1px solid rgba(26,58,46,0.25);
+    border-radius: 8px;
+    font-family: inherit;
+  }
+  .command-form button {
+    background: var(--gold);
+    color: var(--forest);
+    border: none;
+    border-radius: 8px;
+    padding: 0 18px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .command-form button:disabled { opacity: 0.6; cursor: default; }
+  .hint { font-size: 13px; opacity: 0.7; margin-top: 8px; }
+
+  .log { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; max-height: 640px; overflow-y: auto; }
+  .entry { border-left: 3px solid var(--teal); padding: 8px 12px; background: rgba(15,95,92,0.05); border-radius: 0 6px 6px 0; }
+  .entry .instr { font-weight: 600; }
+  .entry pre { white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, monospace; font-size: 13px; margin: 6px 0 0; }
+  .draft { background: #fff; border: 1px solid rgba(26,58,46,0.15); border-radius: 6px; padding: 10px 12px; margin-top: 8px; white-space: pre-wrap; font-size: 14px; line-height: 1.5; position: relative; }
+  .draft .copy { float: right; margin: 0 0 6px 10px; font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--teal); background: none; color: var(--teal); cursor: pointer; }
+  .draft-head { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--teal); font-weight: 600; margin-top: 10px; }
+  .verify { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: #fbf0d6; border: 1px solid #b1832e; font-size: 13px; }
+  .draft-notes { margin-top: 8px; font-size: 13px; opacity: .8; }
+  .badge { display:inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--forest); color: var(--cream); margin-left: 6px; }
+  .badge.dry { background: #b1832e; }
+  .card { background: #fff; border: 1px solid rgba(26,58,46,0.15); border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.5; }
+  .card .top { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .card .who { font-weight: 600; }
+  .card .when { font-size: 12px; opacity: .7; }
+  .card .why { margin-top: 4px; }
+  .card .reply { margin-top: 6px; padding: 8px 10px; background: rgba(15,95,92,0.06); border-radius: 6px; white-space: pre-wrap; }
+  .card .tag { font-size: 12px; opacity: .75; margin-top: 4px; }
+  .pill { display:inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; color: #fff; font-weight: 600; }
+  .pill.good { background: #2e7d4f; } .pill.you { background: #b1832e; } .pill.no { background: #8a3b2e; } .pill.info { background: var(--teal); }
+  details.raw { margin-top: 8px; font-size: 12px; } details.raw summary { cursor: pointer; opacity: .7; }
+  table.mini { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; background: #fff; }
+  table.mini th, table.mini td { text-align: left; padding: 4px 8px; border-bottom: 1px solid rgba(26,58,46,0.12); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid rgba(26,58,46,0.1); }
+  th { color: var(--teal); font-weight: 600; text-transform: uppercase; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sales Agent Command Center</h1>
+  <span class="status" id="status">Checking connection...</span>
+  <span class="spacer"></span>
+  <a class="logout" href="/logout">Sign out</a>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Send an instruction</h2>
+    <form class="command-form" id="cmd-form">
+      <input id="cmd-input" type="text" placeholder='e.g. "draft 3 LinkedIn posts about our retirement plan review"' autocomplete="off" />
+      <button type="submit">Send</button>
+    </form>
+    <div class="hint">Try: "list leads" &middot; "list activity" &middot; "follow up with Marcus" &middot; "draft an email about Medicare planning"</div>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section class="card">
+    <h2>Recent leads</h2>
+    <table id="leads-table">
+      <thead><tr><th>Name</th><th>Status</th><th>Source</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+  const logEl = document.getElementById('log');
+  const statusEl = document.getElementById('status');
+  const form = document.getElementById('cmd-form');
+  const input = document.getElementById('cmd-input');
+
+  async function refreshStatus() {
+    try {
+      const res = await fetch('/health');
+      const data = await res.json();
+      statusEl.innerHTML =
+        '<span class="dot ' + (data.anthropicConfigured ? 'on' : 'off') + '"></span>Claude: ' +
+        (data.anthropicConfigured ? 'live' : 'dry-run') +
+        '  &nbsp; <span class="dot ' + (data.ghlConfigured ? 'on' : 'off') + '"></span>GoHighLevel: ' +
+        (data.ghlConfigured ? (data.ghlSendMode === 'live' ? 'live (sending)' : 'connected (review mode - nothing sends)') : 'dry-run') +
+        '  &nbsp; brand: ' + data.defaultBrain;
+    } catch {
+      statusEl.textContent = 'Cannot reach server.';
+    }
+  }
+
+  function redirectIfSignedOut(res) {
+    if (res.status === 401) {
+      window.location.href = '/login.html';
+      return true;
+    }
+    return false;
+  }
+
+  async function refreshLeads() {
+    try {
+      const res = await fetch('/api/leads');
+      if (redirectIfSignedOut(res)) return;
+      const data = await res.json();
+      const tbody = document.querySelector('#leads-table tbody');
+      tbody.innerHTML = '';
+      // Older copies of a re-sent contact are hidden; names are escaped
+      // because they arrive from outside (web forms, GoHighLevel).
+      (data.leads || []).filter((l) => l.status !== 'superseded').forEach((l) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + escapeHtml([l.first_name, l.last_name].filter(Boolean).join(' ')) + '</td>' +
+          '<td>' + escapeHtml(STATUS_LABELS[l.status] || l.status || '') + '</td><td>' + escapeHtml(l.source || '') + '</td>';
+        tbody.appendChild(tr);
+      });
+    } catch {}
+  }
+
+  function addLogEntry(instruction, result) {
+    const div = document.createElement('div');
+    div.className = 'entry';
+    const badge = result.dryRun ? '<span class="badge dry">DRY RUN</span>' : '<span class="badge">' + result.intent + '</span>';
+    const r = result.response || {};
+    let body;
+    if (Array.isArray(r.drafts)) {
+      body = '';
+      if (r.figuresToVerify && r.figuresToVerify.length) {
+        body += '<div class="verify"><strong>Check before posting:</strong> these figures are not on your approved-facts list, so they may be made up: ' +
+          r.figuresToVerify.map(escapeHtml).join(', ') + '. Replace them with a sourced number or remove them.</div>';
+      }
+      r.drafts.forEach((d, i) => {
+        body += '<div class="draft-head">Draft ' + (i + 1) + '</div>' +
+          '<div class="draft"><button type="button" class="copy">Copy</button>' + escapeHtml(d) + '</div>';
+      });
+      if (r.notes) body += '<div class="draft-notes"><strong>Notes:</strong> ' + escapeHtml(r.notes) + '</div>';
+    } else if (Array.isArray(r.events)) {
+      body = r.events.length ? r.events.map(activityCard).join('') : '<div class="card">No activity yet.</div>';
+      body += rawBlock(r);
+    } else if (Array.isArray(r.leads)) {
+      body = '<table class="mini"><thead><tr><th>Name</th><th>Status</th><th>Source</th><th>Added</th></tr></thead><tbody>' +
+        r.leads.map((l) => '<tr><td>' + escapeHtml(((l.first_name || '') + ' ' + (l.last_name || '')).trim() || '(no name)') +
+          '</td><td>' + escapeHtml(STATUS_LABELS[l.status] || l.status || '') + '</td><td>' + escapeHtml(l.source || '') +
+          '</td><td>' + escapeHtml(when(l.created_at)) + '</td></tr>').join('') + '</tbody></table>';
+    } else {
+      body = '<pre>' + escapeHtml(JSON.stringify(r, null, 2)) + '</pre>';
+    }
+    div.innerHTML = '<div class="instr">' + escapeHtml(instruction) + badge + '</div>' + body;
+    div.querySelectorAll('.copy').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const text = btn.parentElement.textContent.replace(/^Copy/, '');
+        navigator.clipboard.writeText(text).then(() => { btn.textContent = 'Copied'; setTimeout(() => (btn.textContent = 'Copy'), 1500); });
+      });
+    });
+    logEl.prepend(div);
+  }
+
+  const AGENT_LABELS = { leadQualifier: 'New lead', followUp: 'Follow-up', appointmentSetter: 'Appointment', contentDrafter: 'Content drafts', ghlWebhook: 'GoHighLevel event' };
+  const ACTION_LABELS = {
+    qualified: ['Good fit - reply drafted', 'good'],
+    needs_human: ['Needs you', 'you'],
+    disqualified: ['Not a fit', 'no'],
+    blocked_compliance: ['Held for you - compliance', 'you'],
+    blocked_sms_compliance: ['Held for you - compliance', 'you'],
+    draft: ['Drafted', 'info'],
+  };
+  const STATUS_LABELS = { new: 'New', active: 'Active', needs_human: 'Needs you', disqualified: 'Not a fit', superseded: 'Replaced by newer copy', opted_out: 'Opted out', booked: 'Booked', won: 'Client' };
+
+  // Database times are UTC ("2026-10-02 13:47:39"); show them in local time.
+  function when(ts) {
+    if (!ts) return '';
+    const d = new Date(String(ts).replace(' ', 'T') + 'Z');
+    return isNaN(d) ? String(ts) : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  function activityCard(e) {
+    const d = (e.detail && typeof e.detail === 'object') ? e.detail : {};
+    const p = d.parsed || d;
+    let [label, kind] = ACTION_LABELS[e.action] || [String(e.action || '').replace(/_/g, ' '), 'info'];
+    if (/^sent_attempt_(\d+)/.test(e.action || '')) {
+      const n = e.action.match(/\d+/)[0];
+      const held = d.sendResult && d.sendResult.held;
+      label = 'Follow-up #' + n + (held ? ' - saved as draft' : ' - sent');
+      kind = held ? 'info' : 'good';
+    }
+    const who = e.leadName || (e.agent === 'contentDrafter' ? 'Content' : 'General');
+    let html = '<div class="card"><div class="top"><span class="who">' + escapeHtml(who) + ' &middot; ' +
+      escapeHtml(AGENT_LABELS[e.agent] || e.agent) + '</span><span class="when">' + escapeHtml(when(e.created_at)) + '</span></div>' +
+      '<div><span class="pill ' + kind + '">' + escapeHtml(label) + '</span>' + (e.dry_run ? ' <span class="pill no">dry run</span>' : '') + '</div>';
+    const why = p.reason || d.reason;
+    if (why) html += '<div class="why"><strong>Why:</strong> ' + escapeHtml(why) + '</div>';
+    if (d.instruction) html += '<div class="why"><strong>Asked for:</strong> ' + escapeHtml(d.instruction) + '</div>';
+    const msg = p.reply || p.message || p.draftForDrGrove;
+    if (msg) html += '<div class="reply">' + escapeHtml(msg) + '</div>';
+    if (p.suggestedTag) html += '<div class="tag">Suggested tag: ' + escapeHtml(p.suggestedTag) + '</div>';
+    return html + '</div>';
+  }
+
+  function rawBlock(r) {
+    return '<details class="raw"><summary>Show raw data</summary><pre>' + escapeHtml(JSON.stringify(r, null, 2)) + '</pre></details>';
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const instruction = input.value.trim();
+    if (!instruction) return;
+    input.disabled = true;
+    try {
+      const res = await fetch('/command', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ instruction }),
+      });
+      if (redirectIfSignedOut(res)) return;
+      const result = await res.json();
+      addLogEntry(instruction, result);
+      input.value = '';
+      refreshLeads();
+    } catch (err) {
+      addLogEntry(instruction, { response: { error: String(err) } });
+    } finally {
+      input.disabled = false;
+      input.focus();
+    }
+  });
+
+  refreshStatus();
+  refreshLeads();
+</script>
+</body>
+</html>
