@@ -5,13 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>AI Sales Agent | Webtech Design</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/brand/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/brand/favicon-32.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 <style>
+  /* Webtech Design palette, sampled from the logo. The old variable names are
+     kept so the rest of the stylesheet didn't need rewriting:
+     --forest = deep teal (ink/headers), --gold = bright teal (accent/buttons),
+     --teal = mid teal (headings), --cream = light page background. */
   :root {
-    --forest: #1A3A2E;
-    --gold: #C9A84C;
-    --teal: #0F5F5C;
-    --cream: #F5EDD8;
+    --forest: #003840;
+    --gold: #30B8B8;
+    --teal: #0B6670;
+    --cream: #F2F7F7;
   }
   * { box-sizing: border-box; }
   body {
@@ -24,11 +31,21 @@
   header {
     background: var(--forest);
     color: var(--cream);
-    padding: 20px 24px;
+    padding: 14px 24px;
     display: flex;
-    align-items: baseline;
-    gap: 14px;
+    align-items: center;
+    gap: 18px;
     flex-wrap: wrap;
+    border-bottom: 3px solid var(--gold);
+  }
+  header img.logo { height: 46px; width: auto; display: block; }
+  header .titles { display: flex; flex-direction: column; gap: 2px; padding-left: 18px; border-left: 1px solid rgba(242,247,247,0.25); }
+  header .client { font-size: 13px; letter-spacing: 0.04em; opacity: 0.8; }
+  header .workflows { font-size: 12px; opacity: 0.85; }
+  @media (max-width: 600px) {
+    header img.logo { height: 36px; }
+    header .titles { padding-left: 0; border-left: none; }
+    header h1 .by { display: none; } /* the logo already says Webtech Design */
   }
   header .spacer { flex: 1; }
   header a.logout {
@@ -36,18 +53,19 @@
     opacity: 0.75;
     font-size: 13px;
     text-decoration: none;
-    border: 1px solid rgba(245,237,216,0.4);
+    border: 1px solid rgba(242,247,247,0.4);
     border-radius: 6px;
     padding: 4px 10px;
   }
   header a.logout:hover { opacity: 1; }
   header h1 {
-    font-family: 'Cormorant Garamond', serif;
-    font-weight: 500;
-    font-style: italic;
-    font-size: 28px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-style: normal;
+    font-size: 24px;
+    letter-spacing: 0.02em;
     margin: 0;
-    color: var(--gold);
+    color: #fff;
   }
   header h1 .by {
     font-family: 'Barlow Condensed', sans-serif;
@@ -89,7 +107,7 @@
 
   .card {
     background: white;
-    border: 1px solid rgba(26,58,46,0.12);
+    border: 1px solid rgba(0,56,64,0.12);
     border-radius: 10px;
     padding: 18px 20px;
   }
@@ -106,7 +124,7 @@
     flex: 1;
     padding: 12px 14px;
     font-size: 16px;
-    border: 1px solid rgba(26,58,46,0.25);
+    border: 1px solid rgba(0,56,64,0.25);
     border-radius: 8px;
     font-family: inherit;
   }
@@ -125,37 +143,41 @@
   .hint { font-size: 13px; opacity: 0.7; margin-top: 8px; }
 
   .log { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; max-height: 640px; overflow-y: auto; }
-  .entry { border-left: 3px solid var(--teal); padding: 8px 12px; background: rgba(15,95,92,0.05); border-radius: 0 6px 6px 0; }
+  .entry { border-left: 3px solid var(--teal); padding: 8px 12px; background: rgba(11,102,112,0.05); border-radius: 0 6px 6px 0; }
   .entry .instr { font-weight: 600; }
   .entry pre { white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, monospace; font-size: 13px; margin: 6px 0 0; }
-  .draft { background: #fff; border: 1px solid rgba(26,58,46,0.15); border-radius: 6px; padding: 10px 12px; margin-top: 8px; white-space: pre-wrap; font-size: 14px; line-height: 1.5; position: relative; }
+  .draft { background: #fff; border: 1px solid rgba(0,56,64,0.15); border-radius: 6px; padding: 10px 12px; margin-top: 8px; white-space: pre-wrap; font-size: 14px; line-height: 1.5; position: relative; }
   .draft .copy { float: right; margin: 0 0 6px 10px; font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--teal); background: none; color: var(--teal); cursor: pointer; }
   .draft-head { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--teal); font-weight: 600; margin-top: 10px; }
   .verify { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: #fbf0d6; border: 1px solid #b1832e; font-size: 13px; }
   .draft-notes { margin-top: 8px; font-size: 13px; opacity: .8; }
   .badge { display:inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--forest); color: var(--cream); margin-left: 6px; }
   .badge.dry { background: #b1832e; }
-  .card { background: #fff; border: 1px solid rgba(26,58,46,0.15); border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.5; }
+  .card { background: #fff; border: 1px solid rgba(0,56,64,0.15); border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.5; }
   .card .top { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .card .who { font-weight: 600; }
   .card .when { font-size: 12px; opacity: .7; }
   .card .why { margin-top: 4px; }
-  .card .reply { margin-top: 6px; padding: 8px 10px; background: rgba(15,95,92,0.06); border-radius: 6px; white-space: pre-wrap; }
+  .card .reply { margin-top: 6px; padding: 8px 10px; background: rgba(11,102,112,0.06); border-radius: 6px; white-space: pre-wrap; }
   .card .tag { font-size: 12px; opacity: .75; margin-top: 4px; }
   .pill { display:inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; color: #fff; font-weight: 600; }
   .pill.good { background: #2e7d4f; } .pill.you { background: #b1832e; } .pill.no { background: #8a3b2e; } .pill.info { background: var(--teal); }
   details.raw { margin-top: 8px; font-size: 12px; } details.raw summary { cursor: pointer; opacity: .7; }
   table.mini { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; background: #fff; }
-  table.mini th, table.mini td { text-align: left; padding: 4px 8px; border-bottom: 1px solid rgba(26,58,46,0.12); }
+  table.mini th, table.mini td { text-align: left; padding: 4px 8px; border-bottom: 1px solid rgba(0,56,64,0.12); }
 
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid rgba(26,58,46,0.1); }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid rgba(0,56,64,0.1); }
   th { color: var(--teal); font-weight: 600; text-transform: uppercase; font-size: 12px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>AI Sales Agent <span class="by">by Webtech Design</span></h1>
+  <img class="logo" src="/brand/webtech-logo-light.png" alt="Webtech Design">
+  <div class="titles">
+    <h1>AI Sales Agent <span class="by">by Webtech Design</span></h1>
+    <span class="client" id="client">Client: Grove Financial Group Inc.</span>
+  </div>
   <span class="status" id="status">Checking connection...</span>
   <span class="spacer"></span>
   <a class="logout" href="/logout">Sign out</a>
@@ -165,7 +187,7 @@
   <section class="card">
     <h2>Send an instruction</h2>
     <form class="command-form" id="cmd-form">
-      <input id="cmd-input" type="text" placeholder='e.g. "draft 3 LinkedIn posts about our retirement plan review"' autocomplete="off" />
+      <input id="cmd-input" type="text" placeholder='e.g. "draft 3 LinkedIn posts about life insurance for young families"' autocomplete="off" />
       <button type="submit">Send</button>
     </form>
     <div class="hint">Try: "list leads" &middot; "list activity" &middot; "follow up with Marcus" &middot; "draft an email about Medicare planning"</div>
@@ -181,7 +203,7 @@
   </section>
 </main>
 
-<footer class="product">AI Sales Agent is a product of Webtech Design LLC</footer>
+<footer class="product">AI Sales Agent is a product of Webtech Design LLC &middot; <a href="https://the-webtech-design.com" target="_blank" rel="noopener" style="color:inherit">the-webtech-design.com</a></footer>
 
 <script>
   const logEl = document.getElementById('log');
@@ -198,7 +220,11 @@
         (data.anthropicConfigured ? 'live' : 'dry-run') +
         '  &nbsp; <span class="dot ' + (data.ghlConfigured ? 'on' : 'off') + '"></span>GoHighLevel: ' +
         (data.ghlConfigured ? (data.ghlSendMode === 'live' ? 'live (sending)' : 'connected (review mode: drafts only, nothing is sent)') : 'dry-run') +
-        '  &nbsp; Client: ' + escapeHtml(data.clientName || data.defaultBrain);
+        (data.workflows || []).map(function (w) {
+          return '  &nbsp; <span class="dot ' + (w.enabled ? 'on' : 'off') + '"></span>' +
+            escapeHtml(w.name) + ': ' + (w.enabled ? 'on' : 'off (awaiting compliance)');
+        }).join('');
+      document.getElementById('client').textContent = 'Client: ' + (data.clientName || data.defaultBrain);
     } catch {
       statusEl.textContent = 'Cannot reach server.';
     }

@@ -191,10 +191,44 @@ sweep"** in the command center (or send that as `instruction` to
 
 ## Deploying it
 
-This is a plain Node/Express app with a local SQLite file - it runs on
-Render, Railway, Fly.io, or any small VPS. It needs a persistent disk (or
-swap SQLite for a hosted Postgres later) since `data/agent.db` holds your
-lead history.
+This is a plain Node/Express app with a local SQLite file. It runs 24/7 on
+Railway (the current host); it would also run on Render, Fly.io, or a small
+VPS. It needs a persistent disk since `agent.db` holds your lead history and
+login sessions.
+
+### Railway checklist
+
+`railway.json` in this repo already sets the start command, a health check
+on `/health`, and auto-restart if the app crashes. In the Railway dashboard:
+
+1. **Node version:** `package.json` pins Node 22 (`better-sqlite3` 13 will
+   not build on anything older). Nothing to set - Railway reads it.
+2. **Volume (required):** Service > Settings > Volumes > add a volume
+   mounted at `/data`. Without it, every redeploy wipes the lead database
+   and signs you out.
+3. **Variables** (Service > Variables):
+   - `DATA_DIR=/data` - puts the database on that volume
+   - `NODE_ENV=production` and `TRUST_PROXY=1`
+   - `SESSION_SECRET`, `AUTH_USERNAME`, `AUTH_PASSWORD_HASH`, `WEBHOOK_TOKEN`
+   - `ANTHROPIC_API_KEY`, `GHL_API_KEY`, `GHL_LOCATION_ID`
+   - `GHL_SEND_MODE=review` (drafts only) until you are ready to go live
+   - `AUTO_FOLLOWUP=false` until you are ready for the 24/7 scheduler
+   - `RETIREMENT_WORKFLOW_APPROVED=false` until Gradient approves it
+   - Do NOT set `PORT` - Railway supplies it.
+4. **Check it:** open `https://<your-railway-url>/health`. You should see
+   `"ok": true`, both integrations configured, and the list of
+   compliance-gated `workflows` with their on/off state. The same status
+   shows in the command center header after you sign in.
+
+### Compliance on/off switches
+
+Offers in `config/<clientId>.json` can carry an `"approvalFlag"`. Any offer
+with one stays off - the agents never see it - until that environment
+variable is set to `true`. To turn the Retirement Income Conversation on
+after Gradient approves it: Railway > Variables >
+`RETIREMENT_WORKFLOW_APPROVED=true`. Railway restarts the service and it is
+live; no code change needed. Use the same pattern for the Medicare, LTC, CD
+and IUL workflows when they are added.
 
 ## Turning this into a sellable Webtech Design product
 

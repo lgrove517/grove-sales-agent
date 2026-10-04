@@ -47,7 +47,9 @@
     {
       "name": "Retirement Income Conversation",
       "description": "A free, no-cost conversation about whether someone's savings are creating the income they'll need in retirement - their 'income number' in monthly terms. Lead with the messagingThemes questions. Never name 401(k)s, rollovers, pensions, IRAs or plan fees in this offer - those are Grove Wealth Management topics.",
-      "cta": "Book a free 15-minute call"
+      "cta": "Book a free 15-minute call",
+      "approvalFlag": "RETIREMENT_WORKFLOW_APPROVED",
+      "approvalNote": "Submitted to Gradient compliance Oct 4 2026. Stays off until RETIREMENT_WORKFLOW_APPROVED=true is set on the host."
     },
     {
       "name": "Life Insurance / IUL / Annuities",
@@ -203,6 +205,7 @@
     }
   ],
   "messagingThemes": {
+    "approvalFlag": "RETIREMENT_WORKFLOW_APPROVED",
     "retirementIncome": [
       "Are all your savings creating the income you need in retirement?",
       "Do you know your income number?"

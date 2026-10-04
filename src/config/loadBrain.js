@@ -24,8 +24,46 @@ function loadBrain(id) {
   }
 
   const raw = fs.readFileSync(filePath, 'utf8');
-  const brain = JSON.parse(raw);
+  const brain = applyApprovalGates(JSON.parse(raw));
   cache.set(brainId, brain);
+  return brain;
+}
+
+/**
+ * Compliance on/off switch. Any offer (or the messagingThemes block) that
+ * carries an "approvalFlag" stays OFF - removed from what the agents see -
+ * until that environment variable is set to "true" on the host. That lets a
+ * workflow sit in the code, fully built, while Gradient/compliance reviews
+ * it, and go live the day approval lands just by flipping the variable in
+ * Railway (no code change, no redeploy of new code).
+ *
+ * The removed items are listed on brain.pendingWorkflows so the prompt can
+ * tell the agents not to improvise them, and /health can show their status.
+ */
+function isApproved(flag) {
+  return !flag || String(process.env[flag] || '').trim().toLowerCase() === 'true';
+}
+
+function applyApprovalGates(brain) {
+  const pending = [];
+  const workflows = [];
+
+  brain.offers = (brain.offers || []).filter((o) => {
+    if (!o.approvalFlag) return true;
+    const on = isApproved(o.approvalFlag);
+    workflows.push({ name: o.name, flag: o.approvalFlag, enabled: on });
+    if (!on) pending.push(o.name);
+    return on;
+  });
+
+  const themes = brain.messagingThemes;
+  if (themes && themes.approvalFlag && !isApproved(themes.approvalFlag)) {
+    // Keep the notes/flag for reference, drop the actual messaging lines.
+    brain.messagingThemes = { approvalFlag: themes.approvalFlag };
+  }
+
+  brain.pendingWorkflows = pending;
+  brain.workflowStatus = workflows;
   return brain;
 }
 
@@ -62,6 +100,9 @@ function brainToSystemPrompt(brain) {
     ``,
     brain.messagingThemes?.retirementIncome?.length
       ? `RETIREMENT MESSAGING - open retirement conversations with these questions (${brain.messagingThemes.notes || ''}): ${brain.messagingThemes.retirementIncome.map((q) => `"${q}"`).join(' / ')}`
+      : '',
+    brain.pendingWorkflows?.length
+      ? `PENDING COMPLIANCE APPROVAL - these workflows are switched OFF. Do not offer, describe, or write messaging for them, and do not invent a substitute: ${brain.pendingWorkflows.join('; ')}. If a lead raises one of these topics, use the General Conversation offer (an invitation to talk with Dr. Grove) and nothing more.`
       : '',
     `VALUE PROPS: ${(brain.valueProps || []).join('; ')}`,
     ``,
@@ -129,4 +170,4 @@ function brainToSystemPrompt(brain) {
     .join('\n');
 }
 
-module.exports = { loadBrain, clearBrainCache, brainToSystemPrompt, CONFIG_DIR };
+module.exports = { loadBrain, clearBrainCache, brainToSystemPrompt, applyApprovalGates, CONFIG_DIR };

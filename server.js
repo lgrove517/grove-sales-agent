@@ -114,6 +114,8 @@ app.get('/health', (req, res) => {
     ghlSendMode: ghl.sendMode(),
     defaultBrain: process.env.DEFAULT_BRAIN || 'grove-financial',
     clientName: (() => { try { return loadBrain().businessName; } catch { return null; } })(),
+    // Compliance-gated workflows and whether each is switched on.
+    workflows: (() => { try { return loadBrain().workflowStatus || []; } catch { return []; } })(),
   });
 });
 

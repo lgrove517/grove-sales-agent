@@ -5,13 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Sign In | AI Sales Agent by Webtech Design</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/brand/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/brand/favicon-32.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 <style>
+  /* Webtech Design palette, sampled from the logo. The old variable names are
+     kept so the rest of the stylesheet didn't need rewriting:
+     --forest = deep teal (ink/headers), --gold = bright teal (accent/buttons),
+     --teal = mid teal (headings), --cream = light page background. */
   :root {
-    --forest: #1A3A2E;
-    --gold: #C9A84C;
-    --teal: #0F5F5C;
-    --cream: #F5EDD8;
+    --forest: #003840;
+    --gold: #30B8B8;
+    --teal: #0B6670;
+    --cream: #F2F7F7;
   }
   * { box-sizing: border-box; }
   body {
@@ -34,9 +41,9 @@
     box-shadow: 0 12px 40px rgba(0,0,0,0.35);
   }
   h1 {
-    font-family: 'Cormorant Garamond', serif;
-    font-weight: 500;
-    font-style: italic;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-style: normal;
     color: var(--forest);
     font-size: 26px;
     margin: 0 0 4px;
@@ -69,7 +76,7 @@
     width: 100%;
     padding: 11px 12px;
     margin-bottom: 16px;
-    border: 1px solid rgba(26,58,46,0.25);
+    border: 1px solid rgba(0,56,64,0.25);
     border-radius: 7px;
     font-size: 16px;
     font-family: inherit;
@@ -89,6 +96,9 @@
     letter-spacing: 0.04em;
   }
   button:hover { filter: brightness(0.95); }
+  img.logo { display: block; width: 100%; max-width: 260px; height: auto; margin: 0 auto 20px; }
+  .card { background: #fff; border-top: 4px solid var(--gold); }
+  button { color: var(--forest); }
   .error {
     background: #f6d9d3;
     color: #7a2b1a;
@@ -102,6 +112,7 @@
 </head>
 <body>
   <div class="card">
+    <img class="logo" src="/brand/webtech-logo.png" alt="Webtech Design">
     <h1>AI Sales Agent</h1>
     <p class="sub">by Webtech Design</p>
     <div class="error" id="error" hidden></div>
