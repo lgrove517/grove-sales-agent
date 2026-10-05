@@ -38,6 +38,15 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false })); // for the login form POST
 
+// Run each request "inside" the client brain it's for (body or ?brand=), so
+// every GoHighLevel call uses that client's own account. An unknown brand
+// falls through to the route, which reports the missing brain as before.
+app.use((req, res, next) => {
+  let brain = null;
+  try { brain = loadBrain((req.body && req.body.brand) || req.query.brand); } catch { /* route handles it */ }
+  ghl.runWithBrain(brain, next);
+});
+
 app.use(
   session({
     store: new SqliteSessionStore(),
@@ -107,15 +116,17 @@ app.get('/logout', (req, res) => {
 
 // --- Health check ------------------------------------------------------
 app.get('/health', (req, res) => {
+  const brand = req.query.brand;
   res.json({
     ok: true,
     anthropicConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
     ghlConfigured: ghl.isConfigured(),
     ghlSendMode: ghl.sendMode(),
     defaultBrain: process.env.DEFAULT_BRAIN || 'grove-financial',
-    clientName: (() => { try { return loadBrain().businessName; } catch { return null; } })(),
+    brand: brand || process.env.DEFAULT_BRAIN || 'grove-financial',
+    clientName: (() => { try { return loadBrain(brand).businessName; } catch { return null; } })(),
     // Compliance-gated workflows and whether each is switched on.
-    workflows: (() => { try { return loadBrain().workflowStatus || []; } catch { return []; } })(),
+    workflows: (() => { try { return loadBrain(brand).workflowStatus || []; } catch { return []; } })(),
   });
 });
 
@@ -272,7 +283,7 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
       const outboundMessage = ensureCanSpamFooter(channel, verdict.reply, brain).messageText;
       // Same code-level backstop the follow-up and appointment agents use:
       // advisory or investment-topic wording is never auto-sent.
-      const compliance = checkAdvisoryAutoSend(channel, outboundMessage);
+      const compliance = checkAdvisoryAutoSend(channel, outboundMessage, brain);
       if (compliance.blocked) {
         db.logEvent({ leadId, agent: 'leadQualifier', action: 'blocked_compliance', detail: { reason: compliance.reason }, dryRun: false });
         db.updateLeadStatus(leadId, 'needs_human');
@@ -344,6 +355,21 @@ app.post('/command', requireAuth, async (req, res) => {
 });
 
 // --- Read-only helpers for the UI ------------------------------------------
+// The client brains on file (config/*.json, minus the template), for the
+// command center's client switcher.
+app.get('/api/brains', requireAuth, (req, res) => {
+  const fs = require('fs');
+  const { CONFIG_DIR } = require('./src/config/loadBrain');
+  const brains = fs.readdirSync(CONFIG_DIR)
+    .filter((f) => f.endsWith('.json') && !f.startsWith('brain.example'))
+    .map((f) => {
+      const id = f.replace(/\.json$/, '');
+      try { return { id, name: loadBrain(id).businessName || id }; } catch { return null; }
+    })
+    .filter(Boolean);
+  res.json({ brains, defaultBrain: process.env.DEFAULT_BRAIN || 'grove-financial' });
+});
+
 app.get('/api/leads', requireAuth, (req, res) => {
   res.json({ leads: db.listLeads({ brand: req.query.brand, limit: 50 }) });
 });

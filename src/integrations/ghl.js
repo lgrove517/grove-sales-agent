@@ -1,9 +1,42 @@
 const fetch = require('node-fetch');
+const { AsyncLocalStorage } = require('async_hooks');
 
 const API_VERSION = '2021-07-28';
 
+/**
+ * One GoHighLevel account per client. Each request (and each scheduler
+ * sweep) runs "inside" the brain it is working for; every GHL call below
+ * reads that brain's credentials.
+ *
+ * - A brain with "ghl": { "apiKeyEnv": "WEBTECH_GHL_API_KEY",
+ *   "locationIdEnv": "WEBTECH_GHL_LOCATION_ID" } uses ONLY those variables.
+ *   If they're not set, that client runs in DRY_RUN - it never falls back
+ *   to another client's account, so one client's leads can't land in
+ *   another client's GoHighLevel.
+ * - A brain without a "ghl" block (Grove Financial Group today) uses the
+ *   original GHL_API_KEY / GHL_LOCATION_ID, exactly as before.
+ */
+const brainContext = new AsyncLocalStorage();
+
+function runWithBrain(brain, fn) {
+  return brainContext.run(brain || null, fn);
+}
+
+function credentials() {
+  const brain = brainContext.getStore();
+  const cfg = brain && brain.ghl;
+  if (cfg && (cfg.apiKeyEnv || cfg.locationIdEnv)) {
+    return {
+      apiKey: process.env[cfg.apiKeyEnv] || '',
+      locationId: process.env[cfg.locationIdEnv] || '',
+    };
+  }
+  return { apiKey: process.env.GHL_API_KEY || '', locationId: process.env.GHL_LOCATION_ID || '' };
+}
+
 function isConfigured() {
-  return Boolean(process.env.GHL_API_KEY && process.env.GHL_LOCATION_ID);
+  const { apiKey, locationId } = credentials();
+  return Boolean(apiKey && locationId);
 }
 
 function baseUrl() {
@@ -13,7 +46,7 @@ function baseUrl() {
 function headers() {
   return {
     'content-type': 'application/json',
-    Authorization: `Bearer ${process.env.GHL_API_KEY}`,
+    Authorization: `Bearer ${credentials().apiKey}`,
     Version: API_VERSION,
   };
 }
@@ -26,7 +59,7 @@ async function request(method, endpoint, body, dryRunLabel) {
     const fakeId = `dryrun-${dryRunLabel || 'contact'}`;
     return {
       dryRun: true,
-      note: `[DRY_RUN - no GHL_API_KEY/GHL_LOCATION_ID set] Would have called ${method} ${endpoint}`,
+      note: `[DRY_RUN - no GoHighLevel credentials set for this client] Would have called ${method} ${endpoint}`,
       wouldHaveSent: body || null,
       label: dryRunLabel,
       id: fakeId,
@@ -61,7 +94,7 @@ async function upsertContact({ firstName, lastName, email, phone, source, tags }
     'POST',
     '/contacts/upsert',
     {
-      locationId: process.env.GHL_LOCATION_ID,
+      locationId: credentials().locationId,
       firstName,
       lastName,
       email,
@@ -137,7 +170,7 @@ async function createOpportunity({ pipelineId, pipelineStageId, contactId, name,
     'POST',
     '/opportunities/',
     {
-      locationId: process.env.GHL_LOCATION_ID,
+      locationId: credentials().locationId,
       pipelineId,
       pipelineStageId,
       contactId,
@@ -149,6 +182,7 @@ async function createOpportunity({ pipelineId, pipelineStageId, contactId, name,
 }
 
 module.exports = {
+  runWithBrain,
   isConfigured,
   sendMode,
   upsertContact,

@@ -70,7 +70,7 @@ async function draftFollowUp({ brain, lead, attemptNumber, channel = 'SMS', cont
   // Code-level backstop: even if the model ignores the prompt-level SMS
   // restriction, never actually let advisory/securities content go out
   // over SMS - GoHighLevel is not a Gradient-approved vendor for that.
-  const compliance = checkSmsCompliance(parsed.channel, parsed.message);
+  const compliance = checkSmsCompliance(parsed.channel, parsed.message, brain);
   if (compliance.blocked) {
     db.logEvent({
       leadId: lead.id,

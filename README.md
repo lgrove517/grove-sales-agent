@@ -220,6 +220,24 @@ on `/health`, and auto-restart if the app crashes. In the Railway dashboard:
    compliance-gated `workflows` with their on/off state. The same status
    shows in the command center header after you sign in.
 
+### More than one client
+
+Each client is one file in `config/` (Grove Financial Group is
+`grove-financial.json`, Webtech Design is `webtech-design.json`). The
+command center's **Client** menu switches between them; webhooks pick one
+with `"brand": "<file name>"` in the body or `?brand=` in the URL, and
+anything without one uses `DEFAULT_BRAIN`.
+
+- **Separate GoHighLevel accounts.** A client file with a `"ghl"` block
+  (`apiKeyEnv`, `locationIdEnv`) uses only those variables; if they're not
+  set, that client runs in dry-run and never falls back to another
+  client's account. A file without one uses `GHL_API_KEY` /
+  `GHL_LOCATION_ID`.
+- **Financial guards.** The Gradient / Grove Wealth Management investment
+  guards are on for every client unless its file says
+  `"compliance": { "financialAdvisoryGuards": false }` (Webtech does).
+- **Follow-up scheduler.** The 24/7 sweep runs for `DEFAULT_BRAIN` only.
+
 ### Compliance on/off switches
 
 Offers in `config/<clientId>.json` can carry an `"approvalFlag"`. Any offer

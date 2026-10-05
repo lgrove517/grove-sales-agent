@@ -1,7 +1,7 @@
 const { askClaude } = require('../integrations/anthropic');
 const ghl = require('../integrations/ghl');
 const { brainToSystemPrompt } = require('../config/loadBrain');
-const { ensureMedicareDisclaimer, detectInvestmentTopic } = require('../config/complianceGuard');
+const { ensureMedicareDisclaimer, detectInvestmentTopic, financialGuardsOn } = require('../config/complianceGuard');
 const db = require('../store/db');
 
 const ROLE_PROMPT = `
@@ -75,8 +75,11 @@ async function qualifyLead({ brain, lead }) {
   // 401(k)/rollover/pension/IRA/investment topic, this is a Grove Wealth
   // Management conversation for Dr. Grove - never an automated Grove
   // Financial Group reply, whatever the model decided.
-  const leadTopic = detectInvestmentTopic(`${lead.message || ''} ${lead.context || ''}`);
-  const replyTopic = detectInvestmentTopic(parsed.reply);
+  // (Only for brains that carry the financial-advisory guards - see
+  // financialGuardsOn() in complianceGuard.js.)
+  const guarded = financialGuardsOn(brain);
+  const leadTopic = guarded ? detectInvestmentTopic(`${lead.message || ''} ${lead.context || ''}`) : null;
+  const replyTopic = guarded ? detectInvestmentTopic(parsed.reply) : null;
   if (leadTopic || replyTopic) {
     parsed = {
       ...parsed,

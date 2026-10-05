@@ -11,6 +11,7 @@
  */
 const { loadBrain } = require('../config/loadBrain');
 const { draftFollowUp } = require('../agents/followUp');
+const ghl = require('../integrations/ghl');
 const db = require('../store/db');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -67,6 +68,11 @@ function findDueLeads(brand, cadenceDays, maxAttempts) {
  */
 async function runFollowUpSweep({ brand } = {}) {
   const brain = loadBrain(brand);
+  // Every GoHighLevel call in this sweep uses THIS client's account.
+  return ghl.runWithBrain(brain, () => sweepForBrain(brain));
+}
+
+async function sweepForBrain(brain) {
   const followUpCfg = brain.agents?.followUp || {};
 
   if (!followUpCfg.enabled) {

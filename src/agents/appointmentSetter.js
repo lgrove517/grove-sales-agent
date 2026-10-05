@@ -52,7 +52,7 @@ async function handleBookingIntent({ brain, lead, context }) {
   const medicare = ensureMedicareDisclaimer(parsed.message);
   parsed.message = medicare.messageText;
 
-  const compliance = checkSmsCompliance('SMS', parsed.message);
+  const compliance = checkSmsCompliance('SMS', parsed.message, brain);
   if (compliance.blocked) {
     db.logEvent({
       leadId: lead.id,

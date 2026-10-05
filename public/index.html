@@ -42,6 +42,11 @@
   header .titles { display: flex; flex-direction: column; gap: 2px; padding-left: 18px; border-left: 1px solid rgba(242,247,247,0.25); }
   header .client { font-size: 13px; letter-spacing: 0.04em; opacity: 0.8; }
   header .workflows { font-size: 12px; opacity: 0.85; }
+  header select {
+    font: inherit; font-size: 14px; color: #fff; background: rgba(242,247,247,0.08);
+    border: 1px solid rgba(242,247,247,0.35); border-radius: 6px; padding: 3px 8px; margin-left: 4px;
+  }
+  header select option { color: #003840; background: #fff; }
   @media (max-width: 600px) {
     header img.logo { height: 36px; }
     header .titles { padding-left: 0; border-left: none; }
@@ -176,7 +181,9 @@
   <img class="logo" src="/brand/webtech-logo-light.png" alt="Webtech Design">
   <div class="titles">
     <h1>AI Sales Agent <span class="by">by Webtech Design</span></h1>
-    <span class="client" id="client">Client: Grove Financial Group Inc.</span>
+    <label class="client" for="brand-select">Client:
+      <select id="brand-select" aria-label="Choose client"><option value="">Grove Financial Group Inc.</option></select>
+    </label>
   </div>
   <span class="status" id="status">Checking connection...</span>
   <span class="spacer"></span>
@@ -210,10 +217,39 @@
   const statusEl = document.getElementById('status');
   const form = document.getElementById('cmd-form');
   const input = document.getElementById('cmd-input');
+  const brandSelect = document.getElementById('brand-select');
+
+  // Which client the command center is working for. Remembered per browser.
+  function currentBrand() { return brandSelect.value || ''; }
+  function brandQuery() { return currentBrand() ? '?brand=' + encodeURIComponent(currentBrand()) : ''; }
+
+  async function loadBrains() {
+    try {
+      const res = await fetch('/api/brains');
+      if (redirectIfSignedOut(res)) return;
+      const data = await res.json();
+      let saved = '';
+      try { saved = localStorage.getItem('salesAgentBrand') || ''; } catch {}
+      brandSelect.innerHTML = '';
+      (data.brains || []).forEach(function (b) {
+        const opt = document.createElement('option');
+        opt.value = b.id; opt.textContent = b.name;
+        brandSelect.appendChild(opt);
+      });
+      const ids = (data.brains || []).map(function (b) { return b.id; });
+      brandSelect.value = ids.includes(saved) ? saved : (data.defaultBrain || ids[0] || '');
+    } catch {}
+  }
+
+  brandSelect.addEventListener('change', function () {
+    try { localStorage.setItem('salesAgentBrand', currentBrand()); } catch {}
+    refreshStatus();
+    refreshLeads();
+  });
 
   async function refreshStatus() {
     try {
-      const res = await fetch('/health');
+      const res = await fetch('/health' + brandQuery());
       const data = await res.json();
       statusEl.innerHTML =
         '<span class="dot ' + (data.anthropicConfigured ? 'on' : 'off') + '"></span>Claude: ' +
@@ -224,7 +260,6 @@
           return '  &nbsp; <span class="dot ' + (w.enabled ? 'on' : 'off') + '"></span>' +
             escapeHtml(w.name) + ': ' + (w.enabled ? 'on' : 'off (awaiting compliance)');
         }).join('');
-      document.getElementById('client').textContent = 'Client: ' + (data.clientName || data.defaultBrain);
     } catch {
       statusEl.textContent = 'Cannot reach server.';
     }
@@ -240,7 +275,7 @@
 
   async function refreshLeads() {
     try {
-      const res = await fetch('/api/leads');
+      const res = await fetch('/api/leads' + brandQuery());
       if (redirectIfSignedOut(res)) return;
       const data = await res.json();
       const tbody = document.querySelector('#leads-table tbody');
@@ -352,7 +387,7 @@
       const res = await fetch('/command', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ instruction }),
+        body: JSON.stringify({ instruction, brand: currentBrand() || undefined }),
       });
       if (redirectIfSignedOut(res)) return;
       const result = await res.json();
@@ -367,8 +402,10 @@
     }
   });
 
-  refreshStatus();
-  refreshLeads();
+  loadBrains().then(function () {
+    refreshStatus();
+    refreshLeads();
+  });
 </script>
 </body>
 </html>

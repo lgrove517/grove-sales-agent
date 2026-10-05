@@ -59,13 +59,27 @@ function detectInvestmentTopic(text) {
 }
 
 /**
+ * The investment-advisory guards (Gradient / Grove Wealth Management rules)
+ * exist for Grove Financial Group. A client brain that has nothing to do with
+ * securities - Webtech Design, for example - switches them off with
+ * "compliance": { "financialAdvisoryGuards": false }, so a word like
+ * "portfolio" (a web designer's portfolio) or a CPA lead mentioning IRAs
+ * isn't routed to Dr. Grove as an investment inquiry. Missing = ON, so any
+ * brain that doesn't say otherwise keeps the full protection.
+ */
+function financialGuardsOn(brain) {
+  return brain?.compliance?.financialAdvisoryGuards !== false;
+}
+
+/**
  * Returns { blocked: boolean, reason?: string, requiresManualSend?: boolean }.
  * Blocks on every channel now, not just SMS: advisory-flavored content is
  * never auto-sent by this system. The reason text calls out the specific
  * rule that applies (unapproved SMS vendor vs. the manual-send/documentation
  * requirement) so whoever reads the escalation log knows which one fired.
  */
-function checkAdvisoryAutoSend(channel, messageText) {
+function checkAdvisoryAutoSend(channel, messageText, brain) {
+  if (brain && !financialGuardsOn(brain)) return { blocked: false };
   const lower = (messageText || '').toLowerCase();
   const hit = ADVISORY_KEYWORDS.find((kw) => lower.includes(kw));
   if (!hit) {
@@ -168,6 +182,7 @@ function ensureCanSpamFooter(channel, messageText, brain) {
 }
 
 module.exports = {
+  financialGuardsOn,
   checkAdvisoryAutoSend,
   checkSmsCompliance,
   ADVISORY_KEYWORDS,
