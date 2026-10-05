@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign In | AI Sales Agent by Webtech Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/brand/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/brand/favicon-32.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<style>
+  /* Webtech Design palette, sampled from the logo. The old variable names are
+     kept so the rest of the stylesheet didn't need rewriting:
+     --forest = deep teal (ink/headers), --gold = bright teal (accent/buttons),
+     --teal = mid teal (headings), --cream = light page background. */
+  :root {
+    --forest: #003840;
+    --gold: #30B8B8;
+    --teal: #0B6670;
+    --cream: #F2F7F7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--forest);
+    color: var(--forest);
+    font-family: 'Barlow Condensed', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: var(--cream);
+    border-radius: 12px;
+    padding: 36px 32px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  }
+  h1 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-style: normal;
+    color: var(--forest);
+    font-size: 26px;
+    margin: 0 0 4px;
+    text-align: center;
+  }
+  p.product {
+    text-align: center;
+    font-size: 12px;
+    color: var(--teal);
+    opacity: 0.8;
+    margin: 20px 0 0;
+  }
+  p.sub {
+    text-align: center;
+    color: var(--teal);
+    font-size: 14px;
+    margin: 0 0 24px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--forest);
+    margin-bottom: 4px;
+  }
+  input {
+    width: 100%;
+    padding: 11px 12px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(0,56,64,0.25);
+    border-radius: 7px;
+    font-size: 16px;
+    font-family: inherit;
+  }
+  button {
+    width: 100%;
+    background: var(--gold);
+    color: var(--forest);
+    border: none;
+    border-radius: 7px;
+    padding: 12px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  button:hover { filter: brightness(0.95); }
+  img.logo { display: block; width: 100%; max-width: 260px; height: auto; margin: 0 auto 20px; }
+  .card { background: #fff; border-top: 4px solid var(--gold); }
+  button { color: var(--forest); }
+  .error {
+    background: #f6d9d3;
+    color: #7a2b1a;
+    border: 1px solid #d99b8a;
+    border-radius: 7px;
+    padding: 10px 12px;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="/brand/webtech-logo.png" alt="Webtech Design">
+    <h1>AI Sales Agent</h1>
+    <p class="sub">by Webtech Design</p>
+    <div class="error" id="error" hidden></div>
+    <form method="POST" action="/login">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required autofocus />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+      <button type="submit">Sign In</button>
+    </form>
+    <p class="product">A product of Webtech Design LLC</p>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('error');
+    if (err) {
+      const el = document.getElementById('error');
+      el.hidden = false;
+      el.textContent = err === 'locked'
+        ? 'Too many failed attempts. Try again in a few minutes.'
+        : 'Invalid username or password.';
+    }
+  </script>
+</body>
+</html>
