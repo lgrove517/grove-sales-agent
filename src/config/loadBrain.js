@@ -83,6 +83,7 @@ function brainToSystemPrompt(brain) {
   return [
     `You represent ${brain.businessName} (${brain.industry}).`,
     `Website: ${brain.website || 'n/a'}. Phone: ${brain.phone || 'n/a'}.`,
+    brain.bookingLink ? `Booking link (use it when inviting someone to book a call): ${brain.bookingLink}` : '',
     ``,
     brain.marketingApproach ? `MARKETING APPROACH: ${brain.marketingApproach}` : '',
     ``,
