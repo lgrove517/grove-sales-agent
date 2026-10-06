@@ -100,6 +100,13 @@ generic advice. If the numbers are too small to judge, say so and focus on
 getting the first leads in. These are suggestions for the owner only - never
 imply anything has been sent.
 
+Use TODAY'S DATE (given with the numbers) for any timing advice - never
+guess the season or month. Do not state that any platform, ad format or
+practice is "compliant" or meets a regulation; at most say the owner should
+set it up under the right rules (e.g. Meta's Housing special ad category).
+"waitingOnYouNow" counts the same leads as leadsByStatus.needs_human - do not
+count them twice.
+
 Output STRICT JSON only:
 {
   "headline": "one sentence on where the pipeline stands",
@@ -155,7 +162,7 @@ async function recommend({ brain, focus = '' }) {
     system: `${brainToSystemPrompt(brain)}\n\n${RECOMMEND_PROMPT}`,
     messages: [{
       role: 'user',
-      content: `Pipeline numbers (JSON):\n${JSON.stringify(stats, null, 2)}\n\nOwner's question: ${focus || 'What should I do to generate more leads and appointments?'}`,
+      content: `Today's date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Chicago' })}\n\nPipeline numbers (JSON):\n${JSON.stringify(stats, null, 2)}\n\nOwner's question: ${focus || 'What should I do to generate more leads and appointments?'}`,
     }],
     maxTokens: 1200,
   });
