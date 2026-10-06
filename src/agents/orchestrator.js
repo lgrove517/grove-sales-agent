@@ -3,6 +3,7 @@ const { draftContent } = require('./contentAgent');
 const { draftFollowUp } = require('./followUp');
 const { handleBookingIntent } = require('./appointmentSetter');
 const { runFollowUpSweep } = require('../scheduler/followUpScheduler');
+const { buildBriefing, recommend } = require('./briefing');
 const db = require('../store/db');
 
 const ROUTER_PROMPT = `
@@ -17,11 +18,15 @@ one of these intents and extract any parameters mentioned:
 - "list_activity": they want a log/recap of what the agents have done
 - "run_followup_sweep": they want to manually trigger the 24/7 auto
   follow-up scheduler right now instead of waiting for its next run
+- "briefing": they want a recap of what happened since their last visit /
+  last session / while they were away ("what did I miss?")
+- "recommendations": they want advice or ideas on how to get more leads,
+  more booked appointments, or grow the pipeline
 - "unknown": doesn't clearly match any of the above
 
 Output STRICT JSON only:
 {
-  "intent": "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "unknown",
+  "intent": "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "unknown",
   "leadName": "name mentioned, if any, else empty string",
   "cleanedInstruction": "the instruction, lightly cleaned up, to hand to the specialist agent"
 }
@@ -31,6 +36,12 @@ Output STRICT JSON only:
  * command center still does something sensible without a live LLM call. */
 function ruleBasedRoute(instruction) {
   const lower = instruction.toLowerCase();
+  if (/(since (my|the) last|last (visit|session|login|time)|what did i miss|while i was (away|gone|out)|catch me up|\bbriefing\b)/.test(lower)) {
+    return { intent: 'briefing', leadName: '', cleanedInstruction: instruction };
+  }
+  if (!/^(please )?(draft|write|create|make)\b/.test(lower) && /(recommend|advice|ideas? (to|for) (get|generat|grow|book)|how (can|do|should) (i|we) (get|generate|grow|book)|more (leads|appointments|bookings))/.test(lower)) {
+    return { intent: 'recommendations', leadName: '', cleanedInstruction: instruction };
+  }
   if (/(follow.?up sweep|run (the )?sweep|check (for )?(overdue|due) (leads|follow.?ups)|run scheduler)/.test(lower)) {
     return { intent: 'run_followup_sweep', leadName: '', cleanedInstruction: instruction };
   }
@@ -74,7 +85,7 @@ async function classifyIntent(instruction) {
   }
 }
 
-async function runCommand({ brain, instruction }) {
+async function runCommand({ brain, instruction, since }) {
   const routed = await classifyIntent(instruction);
   let response;
 
@@ -131,12 +142,22 @@ async function runCommand({ brain, instruction }) {
       response = await runFollowUpSweep({ brand: brain.clientId });
       break;
     }
+    case 'briefing': {
+      // `since` comes from the signed-in session (the visit before this one);
+      // fall back to the last 7 days.
+      response = buildBriefing({ brain, since: since || db.toDbTime(Date.now() - 7 * 86400000) });
+      break;
+    }
+    case 'recommendations': {
+      response = await recommend({ brain, focus: routed.cleanedInstruction });
+      break;
+    }
     default: {
       response = {
         message:
           "I didn't recognize that as a command yet. Try things like " +
-          '"draft 3 LinkedIn posts about our retirement plan review", ' +
-          '"follow up with Marcus", "list leads", or "run follow-up sweep".',
+          '"what happened since my last visit?", "how can I get more appointments?", ' +
+          '"draft 3 LinkedIn posts", "follow up with Marcus", "list leads", or "run follow-up sweep".',
       };
     }
   }

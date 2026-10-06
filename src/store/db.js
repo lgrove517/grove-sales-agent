@@ -41,6 +41,13 @@ db.exec(`
     FOREIGN KEY (lead_id) REFERENCES leads(id)
   );
 
+  CREATE TABLE IF NOT EXISTS user_visits (
+    username TEXT NOT NULL,
+    brand TEXT NOT NULL,
+    last_seen TEXT NOT NULL,
+    PRIMARY KEY (username, brand)
+  );
+
   CREATE TABLE IF NOT EXISTS commands (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     brand TEXT NOT NULL,
@@ -155,7 +162,98 @@ function listCommands({ limit = 50 } = {}) {
   return db.prepare(`SELECT * FROM commands ORDER BY created_at DESC LIMIT ?`).all(limit);
 }
 
+// --- "Since your last visit" briefing support ------------------------------
+// Times are stored the same way as CURRENT_TIMESTAMP: UTC "YYYY-MM-DD HH:MM:SS",
+// so plain string comparison orders them correctly.
+function toDbTime(date) {
+  return new Date(date).toISOString().replace('T', ' ').slice(0, 19);
+}
+
+function getLastVisit(username, brand) {
+  const row = db.prepare(`SELECT last_seen FROM user_visits WHERE username = ? AND brand = ?`).get(username || '', brand);
+  return row ? row.last_seen : null;
+}
+
+function setLastVisit(username, brand, when = new Date()) {
+  db.prepare(`
+    INSERT INTO user_visits (username, brand, last_seen) VALUES (?, ?, ?)
+    ON CONFLICT(username, brand) DO UPDATE SET last_seen = excluded.last_seen
+  `).run(username || '', brand, toDbTime(when));
+}
+
+/** Leads for one client created after `since` (newest first). */
+function leadsSince(brand, since) {
+  return db
+    .prepare(`SELECT * FROM leads WHERE brand = ? AND created_at > ? ORDER BY created_at DESC`)
+    .all(brand, since);
+}
+
+/**
+ * Agent events for one client after `since`. Events carry no brand of their
+ * own, so they are matched through their lead (lead-less events such as
+ * content drafts show up through commandsSince instead).
+ */
+function eventsSince(brand, since) {
+  return db
+    .prepare(`
+      SELECT e.*, l.first_name, l.last_name, l.status AS lead_status
+      FROM events e JOIN leads l ON l.id = e.lead_id
+      WHERE l.brand = ? AND e.created_at > ?
+      ORDER BY e.created_at DESC
+    `)
+    .all(brand, since);
+}
+
+/** Commands typed in the command center for one client after `since`. */
+function commandsSince(brand, since) {
+  return db
+    .prepare(`SELECT id, instruction, created_at FROM commands WHERE brand = ? AND created_at > ? ORDER BY created_at DESC`)
+    .all(brand, since);
+}
+
+/** Leads that are waiting on a human right now, oldest first. */
+function leadsNeedingHuman(brand, limit = 10) {
+  return db
+    .prepare(`SELECT * FROM leads WHERE brand = ? AND status = 'needs_human' ORDER BY created_at ASC LIMIT ?`)
+    .all(brand, limit);
+}
+
+/** Latest event of a given agent for a lead (used to show the "why"). */
+function latestEvent(leadId, agent) {
+  return db
+    .prepare(`SELECT * FROM events WHERE lead_id = ? AND agent = ? ORDER BY id DESC LIMIT 1`)
+    .get(leadId, agent);
+}
+
+/** Pipeline numbers for the recommendations prompt (last `days` days). */
+function pipelineStats(brand, days = 30) {
+  const since = toDbTime(Date.now() - days * 86400000);
+  const count = (sql, ...args) => db.prepare(sql).get(...args).n;
+  const group = (sql, ...args) =>
+    Object.fromEntries(db.prepare(sql).all(...args).map((r) => [r.k || 'unknown', r.n]));
+  return {
+    windowDays: days,
+    totalLeads: count(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND created_at > ? AND status != 'superseded'`, brand, since),
+    leadsBySource: group(`SELECT source k, COUNT(*) n FROM leads WHERE brand = ? AND created_at > ? AND status != 'superseded' GROUP BY source`, brand, since),
+    leadsByStatus: group(`SELECT status k, COUNT(*) n FROM leads WHERE brand = ? AND created_at > ? AND status != 'superseded' GROUP BY status`, brand, since),
+    agentActions: group(`
+      SELECT e.action k, COUNT(*) n FROM events e JOIN leads l ON l.id = e.lead_id
+      WHERE l.brand = ? AND e.created_at > ? GROUP BY e.action`, brand, since),
+    waitingOnYouNow: count(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND status = 'needs_human'`, brand),
+    allTimeBooked: count(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND status IN ('booked','won')`, brand),
+  };
+}
+
 module.exports = {
+  toDbTime,
+  getLastVisit,
+  setLastVisit,
+  leadsSince,
+  eventsSince,
+  commandsSince,
+  leadsNeedingHuman,
+  latestEvent,
+  pipelineStats,
   db,
   insertLead,
   updateLeadStatus,

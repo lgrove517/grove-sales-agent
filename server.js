@@ -9,6 +9,7 @@ const { loadBrain } = require('./src/config/loadBrain');
 const { qualifyLead } = require('./src/agents/leadQualifier');
 const { handleBookingIntent } = require('./src/agents/appointmentSetter');
 const { runCommand } = require('./src/agents/orchestrator');
+const { buildBriefing, recommend } = require('./src/agents/briefing');
 const ghl = require('./src/integrations/ghl');
 const db = require('./src/store/db');
 const { startScheduler } = require('./src/scheduler/followUpScheduler');
@@ -346,8 +347,51 @@ app.post('/command', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'instruction is required' });
     }
     const brain = loadBrain(brand);
-    const result = await runCommand({ brain, instruction });
+    const result = await runCommand({ brain, instruction, since: briefingSince(req, brain.clientId) });
     res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- "Since your last visit" ------------------------------------------------
+// The first time a signed-in session asks about a client, remember when the
+// user was last here (from the DB) and stamp "now" as the new last visit. The
+// session keeps the old time, so refreshing the page or typing "what did I
+// miss?" shows the same briefing instead of an empty one.
+function briefingSince(req, brand) {
+  req.session.briefingSince = req.session.briefingSince || {};
+  if (!req.session.briefingSince[brand]) {
+    const username = req.session.username || '';
+    const last = db.getLastVisit(username, brand);
+    req.session.briefingSince[brand] = last || db.toDbTime(Date.now() - 7 * 86400000);
+    req.session.firstVisit = req.session.firstVisit || {};
+    req.session.firstVisit[brand] = !last;
+    db.setLastVisit(username, brand);
+  }
+  return req.session.briefingSince[brand];
+}
+
+app.get('/api/briefing', requireAuth, (req, res) => {
+  try {
+    const brain = loadBrain(req.query.brand);
+    const since = briefingSince(req, brain.clientId);
+    const briefing = buildBriefing({ brain, since });
+    briefing.firstVisit = Boolean(req.session.firstVisit && req.session.firstVisit[brain.clientId]);
+    res.json(briefing);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/recommendations', requireAuth, async (req, res) => {
+  try {
+    const brain = loadBrain(req.body.brand);
+    const result = await recommend({ brain, focus: req.body.focus || '' });
+    db.logCommand({ brand: brain.clientId, instruction: '(button) Get recommendations', response: result });
+    res.json({ intent: 'recommendations', dryRun: result.dryRun, response: result });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

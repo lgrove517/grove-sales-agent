@@ -171,6 +171,30 @@
   table.mini { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; background: #fff; }
   table.mini th, table.mini td { text-align: left; padding: 4px 8px; border-bottom: 1px solid rgba(0,56,64,0.12); }
 
+  .briefing { grid-column: 1 / -1; border-left: 4px solid var(--gold); }
+  .briefing .b-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .briefing h2 { margin: 0; }
+  .briefing .b-since { font-size: 13px; opacity: .7; }
+  .briefing .b-summary { margin: 8px 0 10px; font-size: 16px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: rgba(11,102,112,0.08); color: var(--forest); }
+  .chip b { font-weight: 700; }
+  .chip.warn { background: #fbf0d6; border: 1px solid #b1832e; }
+  .b-cols { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 12px; }
+  @media (min-width: 760px) { .b-cols { grid-template-columns: 1fr 1fr; } }
+  .b-cols h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--teal); margin: 0 0 6px; }
+  .b-list { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+  .b-list li { padding: 6px 0; border-bottom: 1px solid rgba(0,56,64,0.08); }
+  .b-list .meta { font-size: 12px; opacity: .7; }
+  .b-actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { background: var(--gold); color: var(--forest); border: none; border-radius: 8px; padding: 8px 14px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; cursor: pointer; }
+  .btn.ghost { background: none; border: 1px solid rgba(0,56,64,0.3); color: var(--forest); }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .rec { background: #fff; border: 1px solid rgba(0,56,64,0.15); border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.5; }
+  .rec .r-title { font-weight: 600; }
+  .rec .r-try { margin-top: 6px; }
+  .rec .r-try button { font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--teal); background: none; color: var(--teal); cursor: pointer; text-align: left; }
+
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid rgba(0,56,64,0.1); }
   th { color: var(--teal); font-weight: 600; text-transform: uppercase; font-size: 12px; }
@@ -191,13 +215,27 @@
 </header>
 
 <main>
+  <section class="card briefing" id="briefing" hidden>
+    <div class="b-head"><h2>Since your last visit</h2><span class="b-since" id="b-since"></span></div>
+    <div class="b-summary" id="b-summary">Loading...</div>
+    <div class="chips" id="b-chips"></div>
+    <div class="b-cols">
+      <div><h3>Waiting on you</h3><ul class="b-list" id="b-needs"></ul></div>
+      <div><h3>New leads</h3><ul class="b-list" id="b-new"></ul></div>
+    </div>
+    <div class="b-actions">
+      <button type="button" class="btn" id="b-recommend">Get recommendations for more leads &amp; appointments</button>
+      <button type="button" class="btn ghost" id="b-hide">Hide</button>
+    </div>
+  </section>
+
   <section class="card">
     <h2>Send an instruction</h2>
     <form class="command-form" id="cmd-form">
       <input id="cmd-input" type="text" placeholder='e.g. "draft 3 LinkedIn posts about life insurance for young families"' autocomplete="off" />
       <button type="submit">Send</button>
     </form>
-    <div class="hint">Try: "list leads" &middot; "list activity" &middot; "follow up with Marcus" &middot; "draft an email about Medicare planning"</div>
+    <div class="hint">Try: "what happened since my last visit?" &middot; "how can I get more appointments?" &middot; "list leads" &middot; "list activity" &middot; "follow up with Marcus" &middot; "draft an email about Medicare planning"</div>
     <div class="log" id="log"></div>
   </section>
 
@@ -245,6 +283,7 @@
     try { localStorage.setItem('salesAgentBrand', currentBrand()); } catch {}
     refreshStatus();
     refreshLeads();
+    refreshBriefing();
   });
 
   async function refreshStatus() {
@@ -308,6 +347,13 @@
           '<div class="draft"><button type="button" class="copy">Copy</button>' + escapeHtml(d) + '</div>';
       });
       if (r.notes) body += '<div class="draft-notes"><strong>Notes:</strong> ' + escapeHtml(r.notes) + '</div>';
+    } else if (r.briefing) {
+      body = '<div class="card"><div>' + escapeHtml(r.summary) + '</div>' + chipsHtml(r.counts) +
+        (r.needsYou && r.needsYou.length ? '<div class="why"><strong>Waiting on you:</strong> ' +
+          r.needsYou.map(function (l) { return escapeHtml(l.name) + (l.reason ? ' (' + escapeHtml(l.reason) + ')' : ''); }).join('; ') + '</div>' : '') +
+        '</div>';
+    } else if (Array.isArray(r.recommendations)) {
+      body = recommendationsHtml(r);
     } else if (Array.isArray(r.events)) {
       body = r.events.length ? r.events.map(activityCard).join('') : '<div class="card">No activity yet.</div>';
       body += rawBlock(r);
@@ -320,6 +366,7 @@
       body = '<pre>' + escapeHtml(JSON.stringify(r, null, 2)) + '</pre>';
     }
     div.innerHTML = '<div class="instr">' + escapeHtml(instruction) + badge + '</div>' + body;
+    wireTryButtons(div);
     div.querySelectorAll('.copy').forEach((btn) => {
       btn.addEventListener('click', () => {
         const text = btn.parentElement.textContent.replace(/^Copy/, '');
@@ -370,6 +417,99 @@
     return html + '</div>';
   }
 
+  // --- "Since your last visit" briefing ---------------------------------
+  const briefingEl = document.getElementById('briefing');
+
+  function chipsHtml(c) {
+    if (!c) return '';
+    const items = [
+      ['newLeads', 'new'], ['goodFit', 'good fit'], ['needsYou', 'need you'], ['notAFit', 'not a fit'],
+      ['followUpsDrafted', 'follow-ups drafted'], ['bookingLinksSent', 'booking links'], ['booked', 'booked'],
+      ['complianceHolds', 'held for compliance'],
+    ];
+    return '<div class="chips">' + items.filter(function (i) { return c[i[0]]; }).map(function (i) {
+      const warn = (i[0] === 'needsYou' || i[0] === 'complianceHolds') ? ' warn' : '';
+      return '<span class="chip' + warn + '"><b>' + c[i[0]] + '</b> ' + i[1] + '</span>';
+    }).join('') + '</div>';
+  }
+
+  async function refreshBriefing() {
+    let hidden = false;
+    try { hidden = sessionStorage.getItem('briefingHidden:' + currentBrand()) === '1'; } catch {}
+    if (hidden) { briefingEl.hidden = true; return; }
+    try {
+      const res = await fetch('/api/briefing' + brandQuery());
+      if (redirectIfSignedOut(res)) return;
+      const b = await res.json();
+      if (b.error) throw new Error(b.error);
+      document.getElementById('b-since').textContent =
+        (b.firstVisit ? 'First visit - showing the last 7 days' : 'Last here ' + when(b.since)) + ' · ' + (b.client || '');
+      document.getElementById('b-summary').textContent = b.summary;
+      document.getElementById('b-chips').innerHTML = chipsHtml(b.counts).replace(/^<div class="chips">|<\/div>$/g, '');
+      document.getElementById('b-needs').innerHTML = (b.needsYou || []).length
+        ? b.needsYou.map(function (l) {
+            return '<li><strong>' + escapeHtml(l.name) + '</strong>' + (l.reason ? ' - ' + escapeHtml(l.reason) : '') +
+              '<div class="meta">' + escapeHtml(l.source) + ' · ' + escapeHtml(when(l.createdAt)) + '</div></li>';
+          }).join('')
+        : '<li class="meta">Nobody is waiting on you.</li>';
+      document.getElementById('b-new').innerHTML = (b.newLeads || []).length
+        ? b.newLeads.map(function (l) {
+            return '<li>' + escapeHtml(l.name) + ' <span class="meta">- ' + escapeHtml(STATUS_LABELS[l.status] || l.status || '') +
+              (l.source ? ' · ' + escapeHtml(l.source) : '') + ' · ' + escapeHtml(when(l.createdAt)) + '</span></li>';
+          }).join('')
+        : '<li class="meta">No new leads since then.</li>';
+      briefingEl.hidden = false;
+    } catch (err) {
+      briefingEl.hidden = true;
+    }
+  }
+
+  document.getElementById('b-hide').addEventListener('click', function () {
+    briefingEl.hidden = true;
+    try { sessionStorage.setItem('briefingHidden:' + currentBrand(), '1'); } catch {}
+  });
+
+  document.getElementById('b-recommend').addEventListener('click', async function () {
+    const btn = this;
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = 'Thinking...';
+    try {
+      const res = await fetch('/api/recommendations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ brand: currentBrand() || undefined }),
+      });
+      if (redirectIfSignedOut(res)) return;
+      addLogEntry('Recommendations for more leads & appointments', await res.json());
+      logEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (err) {
+      addLogEntry('Recommendations', { response: { error: String(err) } });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  });
+
+  function recommendationsHtml(r) {
+    let html = r.headline ? '<div class="why"><strong>' + escapeHtml(r.headline) + '</strong></div>' : '';
+    (r.recommendations || []).forEach(function (x, i) {
+      html += '<div class="rec"><div class="r-title">' + (i + 1) + '. ' + escapeHtml(x.title || '') +
+        (x.effort ? ' <span class="pill info">' + escapeHtml(x.effort) + ' effort</span>' : '') + '</div>' +
+        (x.why ? '<div>' + escapeHtml(x.why) + '</div>' : '') +
+        (x.howTheAgentCanHelp ? '<div class="r-try"><button type="button" data-cmd="' + escapeHtml(x.howTheAgentCanHelp) +
+          '">Try: ' + escapeHtml(x.howTheAgentCanHelp) + '</button></div>' : '') + '</div>';
+    });
+    return html + '<div class="draft-notes">Suggestions only - nothing has been sent.</div>';
+  }
+
+  // "Try:" buttons put the suggested command in the box, ready to send.
+  function wireTryButtons(root) {
+    root.querySelectorAll('[data-cmd]').forEach(function (b) {
+      b.addEventListener('click', function () { input.value = b.getAttribute('data-cmd'); input.focus(); });
+    });
+  }
+
   function rawBlock(r) {
     return '<details class="raw"><summary>Show raw data</summary><pre>' + escapeHtml(JSON.stringify(r, null, 2)) + '</pre></details>';
   }
@@ -405,6 +545,7 @@
   loadBrains().then(function () {
     refreshStatus();
     refreshLeads();
+    refreshBriefing();
   });
 </script>
 </body>
