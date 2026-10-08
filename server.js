@@ -140,17 +140,67 @@ app.get('/health', (req, res) => {
  * (first_name, contact_id, ...); a website form may send camelCase. Accept
  * both, so the agents always see a name, email and the existing GHL contact.
  */
+function isAgentTag(tag) {
+  return /^send-to-sales-agent$/i.test(tag) || /^sales-agent-/i.test(tag);
+}
+
+/**
+ * Makes sure an email ends with the approved sign-off (voice.signOffName,
+ * e.g. "Leon Grove, ChFC®, RICP® - Grove Financial Group"). If the model
+ * already signed with the full name and both designations, it's left alone.
+ * A bare closing line like "Leon", "Leon Grove" or "Dr. Grove" is replaced
+ * rather than doubled up. SMS is left as-is (length matters there).
+ */
+function ensureSignOff(channel, messageText, brain) {
+  const text = (messageText || '').trimEnd();
+  const signOff = brain?.voice?.signOffName;
+  if (channel !== 'Email' || !signOff || !text) return text;
+
+  const [nameLine, ...rest] = signOff.split(' - ');
+  const plain = (s) => s.replace(/[®™]/g, '').replace(/\s+/g, ' ').toLowerCase();
+  if (plain(text).includes(plain(nameLine))) return text;
+
+  const lines = text.split('\n');
+  const last = (lines[lines.length - 1] || '').trim();
+  if (/^[-–—\s]*(leon(\s+grove)?|dr\.?\s*(leon\s+)?grove)[,.\s]*$/i.test(last)) lines.pop();
+  const body = lines.join('\n').trimEnd();
+  const block = [nameLine.trim(), rest.join(' - ').trim()].filter(Boolean).join('\n');
+  // Right under a closing like "Best," - otherwise a blank line first.
+  return /,\s*$/.test(body) ? `${body}\n${block}` : `${body}\n\n${block}`;
+}
+
+/** Sign-off first, then the CAN-SPAM address, so the address sits at the very end. */
+function finalizeOutbound(channel, messageText, brain) {
+  return ensureCanSpamFooter(channel, ensureSignOff(channel, messageText, brain), brain).messageText;
+}
+
+// GoHighLevel can fire the same webhook twice (a retry while the first run
+// is still waiting on the AI, or two workflows on one tag). Ignore a repeat
+// for the same contact within this window so it doesn't get two notes.
+const DUPLICATE_WINDOW_MS = 2 * 60 * 1000;
+const recentRuns = new Map();
+function isDuplicateRun(contactId) {
+  if (!contactId) return false;
+  const now = Date.now();
+  for (const [id, t] of recentRuns) if (now - t > DUPLICATE_WINDOW_MS) recentRuns.delete(id);
+  if (recentRuns.has(contactId)) return true;
+  recentRuns.set(contactId, now);
+  return false;
+}
+
 function normalizeLead(body) {
   const b = body || {};
   const c = b.contact || {};
   const cd = b.customData || b.custom_data || {};
   const pick = (...vals) => vals.find((v) => v !== undefined && v !== null && String(v).trim() !== '');
-  // Internal routing tags (like the one that triggers this webhook) say
-  // nothing about the person, so they're left out of the agent's context.
+  // Internal routing tags (the one that triggers this webhook) and the
+  // agent's own sales-agent-* tags from earlier runs say nothing about the
+  // person, so they're left out of the agent's context - otherwise a past
+  // verdict would bias the new assessment.
   const allTags = (Array.isArray(b.tags) ? b.tags : String(b.tags || '').split(','))
     .map((t) => String(t).trim())
     .filter(Boolean);
-  const tags = allTags.filter((t) => !/^send-to-sales-agent$/i.test(t)).join(', ');
+  const tags = allTags.filter((t) => !isAgentTag(t)).join(', ');
   return {
     brand: pick(b.brand, cd.brand),
     firstName: pick(b.firstName, b.first_name, c.firstName, c.first_name, cd.firstName),
@@ -168,8 +218,13 @@ function normalizeLead(body) {
 app.post('/webhook/lead', checkToken, async (req, res) => {
   try {
     req.body = { ...req.body, ...normalizeLead(req.body) };
+    if (isDuplicateRun(req.body.ghlContactId)) {
+      console.log(`Skipped duplicate webhook for contact ${req.body.ghlContactId}`);
+      return res.json({ skipped: 'duplicate', contactId: req.body.ghlContactId });
+    }
     const brand = req.body.brand || req.query.brand;
     const brain = loadBrain(brand);
+    const channel = req.body.phone ? 'SMS' : 'Email';
 
     const leadId = db.insertLead({
       brand: brain.clientId,
@@ -245,7 +300,7 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
             `SALES AGENT ASSESSMENT: ${label}`,
             verdict.reason ? `Why: ${verdict.reason}` : '',
             verdict.suggestedTag ? `Suggested tag: ${verdict.suggestedTag}` : '',
-            verdict.draftForDrGrove ? `\nDraft for you to review (NOT sent):\n${verdict.draftForDrGrove}` : '',
+            verdict.draftForDrGrove ? `\nDraft for you to review (NOT sent, ${channel}):\n${finalizeOutbound(channel, verdict.draftForDrGrove, brain)}` : '',
           ].filter(Boolean).join('\n'),
         });
       } catch (noteErr) {
@@ -267,12 +322,19 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
       ].filter(Boolean);
       try {
         tagResult = await ghl.addTags({ contactId: ghlContactId, tags });
-        if (req.body.ghlContactId) {
-          await ghl.removeTags({ contactId: ghlContactId, tags: ['send-to-sales-agent'] });
-        }
       } catch (tagErr) {
         console.error('Could not update tags:', tagErr.message);
         tagResult = { error: tagErr.message };
+      }
+      // Separate from the add above, so the trigger tag is cleared even if
+      // adding the verdict tags failed.
+      if (req.body.ghlContactId) {
+        try {
+          await ghl.removeTags({ contactId: ghlContactId, tags: ['send-to-sales-agent'] });
+        } catch (rmErr) {
+          console.error('Could not remove send-to-sales-agent tag:', rmErr.message);
+          tagResult = { ...(tagResult || {}), triggerTagRemoveError: rmErr.message };
+        }
       }
     }
 
@@ -286,10 +348,9 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
       return res.json({ leadId, ghlResult, verdict, assessmentNote, tagResult, sendResult: { held: true, reason: 'no phone or email on file' } });
     }
     if (verdict.verdict === 'qualified' && verdict.reply && ghlContactId) {
-      const channel = req.body.phone ? 'SMS' : 'Email';
-      // CAN-SPAM requires a physical mailing address on commercial email -
-      // no-op for SMS or if the brain has no mailingAddress on file.
-      const outboundMessage = ensureCanSpamFooter(channel, verdict.reply, brain).messageText;
+      // Approved sign-off, then the CAN-SPAM mailing address on email -
+      // both no-ops for SMS.
+      const outboundMessage = finalizeOutbound(channel, verdict.reply, brain);
       // Same code-level backstop the follow-up and appointment agents use:
       // advisory or investment-topic wording is never auto-sent.
       const compliance = checkAdvisoryAutoSend(channel, outboundMessage, brain);
