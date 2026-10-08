@@ -89,6 +89,20 @@ async function draftFollowUp({ brain, lead, attemptNumber, channel = 'SMS', cont
     };
   }
 
+  // Only send on a channel this lead actually has. (Callers that don't pass
+  // phone/email at all are left alone.)
+  if (parsed.shouldSend && ('phone' in lead || 'email' in lead)) {
+    if (!lead.phone && !lead.email) {
+      parsed.shouldSend = false;
+      parsed.reason = 'no phone or email on file';
+    } else if (parsed.channel === 'SMS' && !lead.phone) {
+      parsed.channel = 'Email';
+      parsed.subject = parsed.subject || `Following up - ${brain.businessName}`;
+    } else if (parsed.channel === 'Email' && !lead.email) {
+      parsed.channel = 'SMS';
+    }
+  }
+
   let sendResult = null;
   if (parsed.shouldSend && lead.ghlContactId) {
     sendResult = await ghl.sendMessage({
