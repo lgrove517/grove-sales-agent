@@ -166,6 +166,9 @@ function brainToSystemPrompt(brain) {
       : '',
     ``,
     `Sign off as: ${brain.voice?.signOffName || brain.businessName}.`,
+    brain.voice?.nameInMessages
+      ? `In any message a lead will read, refer to the owner only as "${brain.voice.nameInMessages}" - never with "Dr." in front. (This prompt calls him "Dr. Grove" in internal notes; that is for you, not for messages.)`
+      : '',
   ]
     .filter(Boolean)
     .join('\n');
