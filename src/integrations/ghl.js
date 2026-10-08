@@ -118,6 +118,15 @@ function sendMode() {
 
 /** Send an SMS or Email through GHL's conversations API (or hold it, in review mode). */
 async function sendMessage({ contactId, type, message, subject, html }) {
+  // Code-level backstop for how the owner is named: whatever the model
+  // wrote, apply this client's voice.nameReplacements (e.g. "Dr. Grove" ->
+  // "Leon Grove") before anything is sent or saved as a draft.
+  const reps = (brainContext.getStore() || {}).voice?.nameReplacements || {};
+  for (const [from, to] of Object.entries(reps)) {
+    const re = new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    message = (message || '').replace(re, to);
+    if (html) html = html.replace(re, to);
+  }
   if (isConfigured() && sendMode() !== 'live') {
     const note = [
       `DRAFT - NOT SENT (Sales Agent review mode)`,
