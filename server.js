@@ -277,6 +277,14 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
     }
 
     let sendResult = null;
+    if (verdict.verdict === 'qualified' && verdict.reply && ghlContactId && !req.body.phone && !req.body.email) {
+      // Nothing to send a reply to - hand it over instead of drafting one.
+      db.updateLeadStatus(leadId, 'needs_human');
+      await ghl.addNote({ contactId: ghlContactId, body: 'SALES AGENT: good fit, but this contact has no phone or email on file - no reply drafted. Add one and re-tag send-to-sales-agent.' }).catch(() => {});
+      await ghl.removeTags({ contactId: ghlContactId, tags: ['sales-agent-good-fit'] }).catch(() => {});
+      await ghl.addTags({ contactId: ghlContactId, tags: ['sales-agent-needs-you'] }).catch(() => {});
+      return res.json({ leadId, ghlResult, verdict, assessmentNote, tagResult, sendResult: { held: true, reason: 'no phone or email on file' } });
+    }
     if (verdict.verdict === 'qualified' && verdict.reply && ghlContactId) {
       const channel = req.body.phone ? 'SMS' : 'Email';
       // CAN-SPAM requires a physical mailing address on commercial email -
