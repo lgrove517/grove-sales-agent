@@ -5,12 +5,10 @@
   "businessName": "Webtech Design LLC",
   "industry": "Websites, CRM and marketing automation for small businesses",
   "website": "https://the-webtech-design.com",
-  "phone": "",
-  "bookingLink": "",
+  "phone": "(251) 428-1814",
+  "bookingLink": "https://api.leadconnectorhq.com/widget/bookings/1-1-ai-consultation-calendar",
 
   "_todo": [
-    "phone: Webtech business phone",
-    "bookingLink: GoHighLevel calendar link for the free 20-minute systems review",
     "mailingAddress.value: postal address for email footers (CAN-SPAM)",
     "WEBTECH_GHL_API_KEY and WEBTECH_GHL_LOCATION_ID on Railway",
     "_pricingReference: CPA/tax and medical/dental pricing"
@@ -113,6 +111,7 @@
   "approvedFacts": [],
 
   "guardrails": {
+    "smsRestrictions": "Text messages: keep the first text to 2-3 short sentences (under about 300 characters). Start by naming the business (e.g. 'Hi Maria, it's Dr. Leon Grove with Webtech Design.'), include the booking link on file when inviting them to the free 20-minute systems review, and end the FIRST text to any lead with 'Reply STOP to opt out.' Never send more than one link in a text. Emails can be longer but stay under about 120 words.",
     "neverSay": [
       "Any guaranteed number of leads, sales, closings, patients, rankings or revenue",
       "Any statistic, percentage or dollar figure that is not in approvedFacts - write [ADD REAL NUMBER] instead of inventing one (e.g. never \"most agents lose 20-30% of leads\")",
