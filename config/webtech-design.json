@@ -35,7 +35,9 @@
   "voice": {
     "tone": "Warm, plain-spoken and practical - a local expert who understands busy professionals, not a tech salesperson. Short sentences. Talk about their day (missed calls, slow replies, no-shows, chasing documents), not features. Avoid jargon; if a term like CRM is needed, explain it in a few words.",
     "readingLevel": "8th-9th grade",
-    "signOffName": "Dr. Leon Grove - Webtech Design",
+    "signOffName": "Leon Grove DBA - Webtech Design",
+    "nameInMessages": "Leon Grove",
+    "nameReplacements": { "Dr. Leon Grove": "Leon Grove", "Dr. Grove": "Leon Grove" },
     "bannedPhrases": ["synergy", "game-changer", "unlock your potential", "act now", "limited time offer", "10x", "guaranteed leads", "circle back"]
   },
 

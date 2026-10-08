@@ -14,7 +14,9 @@
   "voice": {
     "tone": "Warm, credible, unhurried. Leads with expertise (ChFC, RICP, 29 years experience, Marine Corps veteran) without being salesy. Speaks to Gulf Coast individuals and business owners like a trusted advisor, not a call-center script. First-touch messages open a conversation about their financial picture broadly - they do not pitch a specific product (see marketingApproach).",
     "readingLevel": "8th-9th grade",
-    "signOffName": "Dr. Leon Grove, ChFC, RICP - Grove Financial Group",
+    "signOffName": "Leon Grove, ChFC®, RICP® - Grove Financial Group",
+    "nameInMessages": "Leon Grove",
+    "nameReplacements": { "Dr. Leon Grove": "Leon Grove", "Dr. Grove": "Leon Grove" },
     "bannedPhrases": [
       "guaranteed returns",
       "risk-free",
