@@ -8,6 +8,7 @@ const { SqliteSessionStore } = require('./src/store/sessionStore');
 const { loadBrain } = require('./src/config/loadBrain');
 const { qualifyLead } = require('./src/agents/leadQualifier');
 const { handleBookingIntent } = require('./src/agents/appointmentSetter');
+const { handleReply } = require('./src/agents/replyHandler');
 const { runCommand } = require('./src/agents/orchestrator');
 const { buildBriefing, recommend } = require('./src/agents/briefing');
 const ghl = require('./src/integrations/ghl');
@@ -369,6 +370,161 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
     }
 
     res.json({ leadId, ghlResult, verdict, assessmentNote, tagResult, sendResult });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Lead replied ----------------------------------------------------------
+// Point a GHL workflow with the "Customer Replied" trigger at
+// POST /webhook/reply. The agent reads the reply, tags the contact with what
+// the person wants, and drafts the next message (a note in review mode).
+// Opt-outs are honored in code and never get a reply.
+function normalizeReply(body) {
+  const b = body || {};
+  const c = b.contact || {};
+  const cd = b.customData || b.custom_data || {};
+  const m = b.message && typeof b.message === 'object' ? b.message : {};
+  const pick = (...vals) => vals.find((v) => v !== undefined && v !== null && String(v).trim() !== '');
+  const rawChannel = String(pick(cd.reply_channel, cd.channel, m.type, b.messageType, b.message_type) || '');
+  return {
+    ghlContactId: pick(cd.contactId, cd.contact_id, b.contactId, b.contact_id, c.id),
+    replyText: String(pick(cd.reply_text, cd.message, m.body, typeof b.message === 'string' ? b.message : null, b.body, b.reply) || ''),
+    rawChannel,
+    firstName: pick(b.firstName, b.first_name, c.firstName, c.first_name),
+    lastName: pick(b.lastName, b.last_name, c.lastName, c.last_name),
+    email: pick(b.email, c.email),
+    phone: pick(b.phone, c.phone),
+    state: pick(b.state, c.state),
+  };
+}
+
+const REPLY_LABELS = {
+  wants_to_book: 'Wants to book - reply drafted',
+  question: 'Asked a question - reply drafted',
+  not_now: 'Interested, not ready - reply drafted',
+  not_interested: 'Not interested - closing reply drafted, follow-ups stopped',
+  needs_human: 'Needs you - no reply drafted',
+  opted_out: 'Asked to stop - no reply, all automated messages stopped',
+};
+const REPLY_TAGS = {
+  wants_to_book: 'sales-agent-wants-to-book',
+  question: 'sales-agent-replied',
+  not_now: 'sales-agent-not-now',
+  not_interested: 'sales-agent-not-interested',
+  needs_human: 'sales-agent-needs-you',
+  opted_out: 'sales-agent-opted-out',
+};
+const REPLY_STATUS = { not_interested: 'disqualified', needs_human: 'needs_human', opted_out: 'opted_out' };
+
+function lastAgentMessage(leadId) {
+  for (const agent of ['replyHandler', 'leadQualifier', 'followUp']) {
+    const ev = db.latestEvent(leadId, agent);
+    if (!ev) continue;
+    let d = ev.detail;
+    try { d = typeof d === 'string' ? JSON.parse(d) : d; } catch { continue; }
+    const text = d && (d.reply || d.draftForDrGrove || d.message || (d.parsed && d.parsed.message));
+    if (text) return text;
+  }
+  return null;
+}
+
+app.post('/webhook/reply', checkToken, async (req, res) => {
+  try {
+    const r = normalizeReply(req.body);
+    if (!r.ghlContactId) {
+      console.error('Reply webhook without a contact id. Keys received:', Object.keys(req.body || {}).join(', '));
+      return res.status(400).json({ error: 'no contact id in the reply webhook' });
+    }
+    if (isDuplicateRun(`reply:${r.ghlContactId}:${r.replyText}`)) {
+      return res.json({ skipped: 'duplicate', contactId: r.ghlContactId });
+    }
+    if (!r.replyText) {
+      console.warn('Reply webhook with no message text. Keys received:', Object.keys(req.body || {}).join(', '));
+    }
+    const brain = loadBrain(req.body.brand || req.query.brand);
+    const channel = /mail/i.test(r.rawChannel) ? 'Email' : /sms|text|phone/i.test(r.rawChannel) ? 'SMS' : (r.phone ? 'SMS' : 'Email');
+
+    let lead = db.findLeadByGhlContactId(r.ghlContactId);
+    if (!lead) {
+      const id = db.insertLead({ brand: brain.clientId, firstName: r.firstName, lastName: r.lastName, email: r.email, phone: r.phone, source: 'reply', state: r.state, status: 'active', ghlContactId: r.ghlContactId });
+      lead = db.getLead(id);
+    }
+    const leadInfo = { id: lead.id, firstName: lead.first_name || r.firstName, lastName: lead.last_name || r.lastName, ghlContactId: r.ghlContactId };
+
+    // Someone who already opted out and writes again (often "START" or a
+    // question) is for Dr. Grove to handle personally - never automated.
+    const previouslyOptedOut = lead.status === 'opted_out';
+    const result = previouslyOptedOut
+      ? { intent: 'needs_human', reason: 'This contact opted out earlier and has written again - please handle personally.', reply: '' }
+      : await handleReply({ brain, lead: leadInfo, replyText: r.replyText, channel, context: lastAgentMessage(lead.id) });
+
+    if (REPLY_STATUS[result.intent]) db.updateLeadStatus(lead.id, REPLY_STATUS[result.intent]);
+    else if (lead.status !== 'booked' && lead.status !== 'won') db.updateLeadStatus(lead.id, 'active');
+
+    const label = REPLY_LABELS[result.intent] || result.intent;
+    await ghl.addNote({
+      contactId: r.ghlContactId,
+      body: [
+        `SALES AGENT - REPLY RECEIVED: ${label}`,
+        `Their reply (${channel}): ${r.replyText || '(no text came through)'}`,
+        result.reason ? `Why: ${result.reason}` : '',
+        result.draftForDrGrove ? `\nDraft for you to review (NOT sent):\n${finalizeOutbound(channel, result.draftForDrGrove, brain)}` : '',
+      ].filter(Boolean).join('\n'),
+    }).catch((e) => console.error('Could not add reply note:', e.message));
+
+    const tags = [REPLY_TAGS[result.intent], result.investmentTopic ? 'gwm-investment-inquiry' : null].filter(Boolean);
+    await ghl.addTags({ contactId: r.ghlContactId, tags }).catch((e) => console.error('Could not tag reply:', e.message));
+
+    let sendResult = null;
+    if (result.reply) {
+      const outbound = finalizeOutbound(channel, result.reply, brain);
+      const compliance = checkAdvisoryAutoSend(channel, outbound, brain);
+      if (compliance.blocked) {
+        db.updateLeadStatus(lead.id, 'needs_human');
+        await ghl.addNote({ contactId: r.ghlContactId, body: `SALES AGENT: reply held, not sent\nWhy: ${compliance.reason}\n\n${outbound}` }).catch(() => {});
+        sendResult = { held: true, reason: compliance.reason };
+      } else {
+        sendResult = await ghl.sendMessage({ contactId: r.ghlContactId, type: channel, message: outbound, subject: `Re: ${brain.businessName}` });
+      }
+    }
+
+    res.json({ leadId: lead.id, intent: result.intent, reason: result.reason, tags, sendResult });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Status sync ------------------------------------------------------------
+// GHL tells the agent when something happened outside it, so it stops
+// nurturing that person: POST /webhook/status?status=booked (an "Appointment
+// Status: Booked" workflow), ?status=opted_out (a "Contact DND changed" or
+// opt-out workflow), ?status=won (a won opportunity).
+const STATUS_SYNC = {
+  booked: { tag: 'sales-agent-booked', note: 'Appointment booked - automated follow-ups stopped.' },
+  won: { tag: 'sales-agent-won', note: 'Marked won - automated follow-ups stopped.' },
+  opted_out: { tag: 'sales-agent-opted-out', note: 'Opted out - no more automated messages.' },
+};
+
+app.post('/webhook/status', checkToken, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const cd = b.customData || b.custom_data || {};
+    const status = String(req.query.status || cd.status || b.status || '').toLowerCase().replace(/[\s-]+/g, '_');
+    const contactId = cd.contactId || cd.contact_id || b.contactId || b.contact_id || (b.contact && b.contact.id);
+    if (!STATUS_SYNC[status]) return res.status(400).json({ error: `status must be one of: ${Object.keys(STATUS_SYNC).join(', ')}` });
+    if (!contactId) return res.status(400).json({ error: 'no contact id in the status webhook' });
+
+    const lead = db.findLeadByGhlContactId(contactId);
+    if (!lead) return res.json({ found: false, contactId, note: 'Not a contact the agent has worked - nothing to update.' });
+
+    db.updateLeadStatus(lead.id, status);
+    db.logEvent({ leadId: lead.id, agent: 'statusSync', action: status, detail: { contactId }, dryRun: false });
+    await ghl.addTags({ contactId, tags: [STATUS_SYNC[status].tag] }).catch((e) => console.error('Could not tag status:', e.message));
+    await ghl.addNote({ contactId, body: `SALES AGENT: ${STATUS_SYNC[status].note}` }).catch((e) => console.error('Could not add status note:', e.message));
+    res.json({ found: true, leadId: lead.id, status });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
