@@ -219,6 +219,18 @@ function leadsNeedingHuman(brand, limit = 10) {
 }
 
 /** Latest event of a given agent for a lead (used to show the "why"). */
+/**
+ * The current lead for a GoHighLevel contact: the newest copy that hasn't
+ * been superseded by a later re-send. Used when a reply or a status change
+ * comes in from GHL, which only knows the contact id.
+ */
+function findLeadByGhlContactId(ghlContactId) {
+  if (!ghlContactId) return null;
+  return db
+    .prepare(`SELECT * FROM leads WHERE ghl_contact_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT 1`)
+    .get(ghlContactId) || null;
+}
+
 function latestEvent(leadId, agent) {
   return db
     .prepare(`SELECT * FROM events WHERE lead_id = ? AND agent = ? ORDER BY id DESC LIMIT 1`)
@@ -253,6 +265,7 @@ module.exports = {
   commandsSince,
   leadsNeedingHuman,
   latestEvent,
+  findLeadByGhlContactId,
   pipelineStats,
   db,
   insertLead,
