@@ -118,6 +118,9 @@ function brainToSystemPrompt(brain) {
       ? `PENDING COMPLIANCE APPROVAL - these workflows are switched OFF. Do not offer, describe, or write messaging for them, and do not invent a substitute: ${brain.pendingWorkflows.join('; ')}. If a lead raises one of these topics, use the General Conversation offer (an invitation to talk with Dr. Grove) and nothing more.`
       : '',
     `VALUE PROPS: ${(brain.valueProps || []).join('; ')}`,
+    brain.donorRules?.handoffThreshold
+      ? `HANDOFF AMOUNT: the handoff amount is $${Number(brain.donorRules.handoffThreshold).toLocaleString('en-US')}. Only a gift or pledge of $${Number(brain.donorRules.handoffThreshold).toLocaleString('en-US')} or more goes to Dr. Grove because of its size (the system checks the amount itself). A smaller gift or pledge (for example $25, $100 or $1,000) is NOT a handoff on amount alone: thank them warmly and give the next step (the giving page, or a simple payment schedule for a pledge) - unless something else in the escalation rules applies.`
+      : '',
     ``,
     brain.approvedAnswers?.length
       ? [
