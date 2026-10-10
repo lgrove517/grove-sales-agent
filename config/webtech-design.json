@@ -25,6 +25,25 @@
     "_note": "Webtech's own GoHighLevel sub-account. Until both variables are set on the host, this client runs in DRY_RUN and never touches Grove Financial Group's GoHighLevel."
   },
 
+  "stripe": {
+    "_note": "Billing bridge: Stripe -> POST /webhook/stripe -> tags on the client's contact in Webtech's GHL. GHL workflows on these tags send onboarding / card-update emails. A plan is recognized by the Payment Link's metadata 'plan' (e.g. starter) if set, otherwise by the amount charged at checkout (setup fee + first month, or an upgrade fee). If prices change, update checkoutTotalCents here.",
+    "tags": {
+      "paid": "webtech-client-paid",
+      "upgraded": "webtech-upgrade-paid",
+      "current": "webtech-paid-current",
+      "paymentFailed": "webtech-payment-failed",
+      "canceled": "webtech-canceled"
+    },
+    "plans": {
+      "starter": { "label": "Starter ($750 setup + $297/mo)", "checkoutTotalCents": 104700, "tag": "webtech-plan-starter" },
+      "growth": { "label": "Growth ($1,250 setup + $497/mo)", "checkoutTotalCents": 174700, "tag": "webtech-plan-growth" },
+      "premium": { "label": "Premium ($2,000 setup + $797/mo)", "checkoutTotalCents": 279700, "tag": "webtech-plan-premium" },
+      "upgrade-growth": { "label": "Upgrade fee: Starter to Growth ($500)", "checkoutTotalCents": 50000, "tag": "webtech-plan-growth" },
+      "upgrade-premium": { "label": "Upgrade fee: Growth to Premium ($750)", "checkoutTotalCents": 75000, "tag": "webtech-plan-premium" },
+      "upgrade-starter-premium": { "label": "Upgrade fee: Starter to Premium ($1,250)", "checkoutTotalCents": 125000, "tag": "webtech-plan-premium" }
+    }
+  },
+
   "compliance": {
     "financialAdvisoryGuards": false,
     "_note": "Webtech sells web and automation services, not securities, so the Gradient/Grove Wealth Management guards are off for this client only. Grove Financial Group keeps them."
