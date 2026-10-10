@@ -37,7 +37,8 @@ if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
 }
 
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+// Keep the exact bytes Stripe sent: its signature check needs the raw body.
+app.use(express.json({ limit: '1mb', verify: (req, res, buf) => { if (req.originalUrl.startsWith('/webhook/stripe')) req.rawBody = buf.toString('utf8'); } }));
 app.use(express.urlencoded({ extended: false })); // for the login form POST
 
 // Run each request "inside" the client brain it's for (body or ?brand=), so
@@ -527,6 +528,62 @@ app.post('/webhook/reply', checkToken, async (req, res) => {
     res.json({ leadId: lead.id, intent: result.intent, reason: result.reason, tags, sendResult });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Stripe billing (Webtech Design) ------------------------------------------
+// Stripe -> POST /webhook/stripe. Authenticated by Stripe's own signature
+// (STRIPE_WEBHOOK_SECRET), not WEBHOOK_TOKEN. Tags the paying client's
+// contact in the billing brain's GHL account (STRIPE_BRAIN, default
+// webtech-design); GHL workflows on those tags send the emails.
+const stripeHook = require('./src/integrations/stripeWebhook');
+
+app.post('/webhook/stripe', async (req, res) => {
+  const check = stripeHook.verifySignature(req.rawBody, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+  if (!check.ok) {
+    console.error('Stripe webhook rejected:', check.reason);
+    return res.status(400).json({ error: check.reason });
+  }
+  const event = req.body || {};
+  if (stripeHook.alreadyHandled(event.id)) return res.json({ received: true, duplicate: true });
+
+  let brain;
+  try { brain = loadBrain(process.env.STRIPE_BRAIN || 'webtech-design'); } catch (e) {
+    console.error('Stripe webhook: billing brain not available:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+
+  try {
+    const action = stripeHook.eventToAction(event, brain);
+    if (action.ignore) {
+      if (action.needsAttention) console.warn('Stripe webhook:', action.ignore);
+      stripeHook.markHandled(event.id);
+      return res.json({ received: true, ignored: action.ignore });
+    }
+    if (!action.email) {
+      console.warn(`Stripe webhook: ${event.type} ${event.id} has no customer email - nothing to tag.`);
+      stripeHook.markHandled(event.id);
+      return res.json({ received: true, ignored: 'no customer email' });
+    }
+
+    const result = await ghl.runWithBrain(brain, async () => {
+      const { firstName, lastName } = stripeHook.splitName(action.name);
+      const up = await ghl.upsertContact({ firstName, lastName, email: action.email, phone: action.phone || undefined, source: 'Stripe' });
+      const contactId = up.contact?.id || up.id;
+      if (!contactId) throw new Error('GHL did not return a contact id for ' + action.email);
+      if (action.removeTags?.length) await ghl.removeTags({ contactId, tags: action.removeTags }).catch((e) => console.error('Stripe webhook: could not remove tags:', e.message));
+      if (action.addTags?.length) await ghl.addTags({ contactId, tags: action.addTags });
+      if (action.note) await ghl.addNote({ contactId, body: action.note }).catch((e) => console.error('Stripe webhook: could not add note:', e.message));
+      return { contactId, dryRun: Boolean(up.dryRun) };
+    });
+
+    stripeHook.markHandled(event.id);
+    console.log(`Stripe webhook: ${event.type} -> ${action.email} tagged [${(action.addTags || []).join(', ')}]${result.dryRun ? ' (DRY_RUN - Webtech GHL keys not set)' : ''}`);
+    res.json({ received: true, type: event.type, ...result, tagged: action.addTags });
+  } catch (err) {
+    // A 500 makes Stripe retry later (it was not marked handled).
+    console.error('Stripe webhook failed:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
