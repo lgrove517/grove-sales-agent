@@ -181,7 +181,64 @@ function ensureCanSpamFooter(channel, messageText, brain) {
   };
 }
 
+/**
+ * Separation guard, configured per brain (compliance.blockedMentions): a
+ * client like Village Covenant Foundation must never mention Dr. Grove's
+ * advisory or insurance businesses or any financial product. Returns the
+ * same { blocked, reason } shape as checkAdvisoryAutoSend so callers can
+ * hold the message for Dr. Grove instead of sending it.
+ */
+function checkSeparation(messageText, brain) {
+  const rules = brain?.compliance?.blockedMentions || [];
+  const text = messageText || '';
+  const hit = rules.find((r) => new RegExp(r.pattern, 'i').test(text));
+  if (!hit) return { blocked: false };
+  return {
+    blocked: true,
+    requiresManualSend: true,
+    reason: `Draft mentions ${hit.label}, which ${brain.businessName} messages must never mention (separation rule). Held for Dr. Grove to review and rewrite.`,
+  };
+}
+
+/** Largest dollar amount mentioned in a message ("$5,000", "5k", "$1.2 million", "10,000 dollars"). */
+function largestAmount(text) {
+  const re = /\$\s*([\d,]+(?:\.\d+)?)\s*(k|thousand|m|million)?\b|\b([\d,]+(?:\.\d+)?)\s*(k|thousand|million|dollars)\b/gi;
+  let max = 0;
+  let m;
+  while ((m = re.exec(text || ''))) {
+    const n = parseFloat((m[1] || m[3] || '0').replace(/,/g, ''));
+    const unit = (m[2] || m[4] || '').toLowerCase();
+    const mult = unit === 'k' || unit === 'thousand' ? 1e3 : unit === 'm' || unit === 'million' ? 1e6 : 1;
+    if (!Number.isNaN(n)) max = Math.max(max, n * mult);
+  }
+  return max;
+}
+
+/**
+ * Donor handoff rules (brain.donorRules), enforced in code rather than left
+ * to the model: a gift interest at or above the threshold, or any planned-
+ * gift or sensitive topic, goes to Dr. Grove personally. Returns null, or
+ * { reason, tagKey } where tagKey is looked up in brain.agentTags.
+ */
+function detectDonorHandoff(text, brain) {
+  const rules = brain?.donorRules;
+  if (!rules || !text) return null;
+  const amount = largestAmount(text);
+  if (rules.handoffThreshold && amount >= rules.handoffThreshold) {
+    return {
+      reason: `Mentions a gift of about $${amount.toLocaleString('en-US')}, at or above the $${Number(rules.handoffThreshold).toLocaleString('en-US')} handoff amount - for Dr. Grove personally.`,
+      tagKey: 'handoff',
+    };
+  }
+  const hit = (rules.handoffTopics || []).find((t) => new RegExp(t.pattern, 'i').test(text));
+  if (hit) return { reason: `Mentions ${hit.label} - for Dr. Grove personally.`, tagKey: hit.tag || 'handoff' };
+  return null;
+}
+
 module.exports = {
+  checkSeparation,
+  detectDonorHandoff,
+  largestAmount,
   financialGuardsOn,
   checkAdvisoryAutoSend,
   checkSmsCompliance,

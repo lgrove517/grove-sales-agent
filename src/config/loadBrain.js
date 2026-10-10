@@ -13,6 +13,13 @@ const cache = new Map();
 function loadBrain(id) {
   const brainId = id || process.env.DEFAULT_BRAIN || 'grove-financial';
 
+  // A dedicated deployment (e.g. the Village Covenant Foundation service)
+  // sets ALLOWED_BRAINS=vcf so it can never load another client's brain,
+  // even if a webhook or the client menu asks for one.
+  if (!isAllowedBrain(brainId)) {
+    throw new Error(`Brain "${brainId}" is not served by this deployment (ALLOWED_BRAINS=${process.env.ALLOWED_BRAINS}).`);
+  }
+
   if (cache.has(brainId)) return cache.get(brainId);
 
   const filePath = path.join(CONFIG_DIR, `${brainId}.json`);
@@ -40,6 +47,11 @@ function loadBrain(id) {
  * The removed items are listed on brain.pendingWorkflows so the prompt can
  * tell the agents not to improvise them, and /health can show their status.
  */
+function isAllowedBrain(brainId) {
+  const allowed = String(process.env.ALLOWED_BRAINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+  return !allowed.length || allowed.includes(brainId);
+}
+
 function isApproved(flag) {
   return !flag || String(process.env[flag] || '').trim().toLowerCase() === 'true';
 }
@@ -107,6 +119,13 @@ function brainToSystemPrompt(brain) {
       : '',
     `VALUE PROPS: ${(brain.valueProps || []).join('; ')}`,
     ``,
+    brain.approvedAnswers?.length
+      ? [
+          `APPROVED ANSWERS - when someone asks one of these, answer only as written here (where it says "word for word", quote it exactly):`,
+          ...brain.approvedAnswers.map((x) => `- Q: ${x.q}\n  A: ${x.a}`),
+          ``,
+        ].join('\n')
+      : '',
     `OBJECTION HANDLING:`,
     ...Object.entries(brain.objectionHandling || {}).map(
       ([obj, resp]) => `- If they say ${obj}: ${resp}`
@@ -174,4 +193,4 @@ function brainToSystemPrompt(brain) {
     .join('\n');
 }
 
-module.exports = { loadBrain, clearBrainCache, brainToSystemPrompt, applyApprovalGates, CONFIG_DIR };
+module.exports = { loadBrain, clearBrainCache, brainToSystemPrompt, applyApprovalGates, isAllowedBrain, CONFIG_DIR };
