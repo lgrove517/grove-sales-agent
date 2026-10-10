@@ -1,6 +1,6 @@
 const { askClaude } = require('../integrations/anthropic');
 const { brainToSystemPrompt } = require('../config/loadBrain');
-const { ensureMedicareDisclaimer, detectInvestmentTopic, financialGuardsOn } = require('../config/complianceGuard');
+const { ensureMedicareDisclaimer, detectInvestmentTopic, financialGuardsOn, detectDonorHandoff } = require('../config/complianceGuard');
 const db = require('../store/db');
 
 /**
@@ -19,7 +19,7 @@ Read their reply and decide which ONE of these it is:
 - "question": they asked something you can answer within the guardrails above.
   Answer briefly and plainly, then invite them to the next step. If the honest
   answer needs a licensed professional's judgment about THEIR situation, say
-  that is exactly what the conversation with Leon Grove is for.
+  that is exactly what a conversation with the business owner (see OFFERS above) is for.
 - "not_now": they are interested but not ready (busy, later, after the
   holidays). Draft a gracious reply that leaves the door open - no pressure.
 - "not_interested": they politely declined. Draft a one or two sentence thank
@@ -101,6 +101,19 @@ async function handleReply({ brain, lead, replyText, channel, context }) {
       reply: '',
       draftForDrGrove: parsed.reply || '',
       investmentTopic: true,
+    };
+  }
+
+  // Donor handoff rules (brains with donorRules): large gifts, planned
+  // gifts and sensitive topics go to Dr. Grove personally, in code.
+  const handoff = detectDonorHandoff(text, brain);
+  if (handoff) {
+    parsed = {
+      intent: 'needs_human',
+      reason: `${handoff.reason} (Agent's read: ${parsed.reason || 'n/a'})`,
+      reply: '',
+      draftForDrGrove: parsed.reply || parsed.draftForDrGrove || '',
+      handoffTagKey: handoff.tagKey,
     };
   }
 
