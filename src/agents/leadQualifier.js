@@ -1,7 +1,7 @@
 const { askClaude } = require('../integrations/anthropic');
 const ghl = require('../integrations/ghl');
 const { brainToSystemPrompt } = require('../config/loadBrain');
-const { ensureMedicareDisclaimer, detectInvestmentTopic, financialGuardsOn } = require('../config/complianceGuard');
+const { ensureMedicareDisclaimer, detectInvestmentTopic, financialGuardsOn, detectDonorHandoff } = require('../config/complianceGuard');
 const db = require('../store/db');
 
 const ROLE_PROMPT = `
@@ -90,6 +90,21 @@ async function qualifyLead({ brain, lead }) {
       reply: '',
       draftForDrGrove: parsed.reply || '',
       suggestedTag: 'gwm-investment-inquiry',
+    };
+  }
+
+  // Donor handoff rules (brains with donorRules, e.g. Village Covenant
+  // Foundation): large gifts, planned gifts and sensitive topics go to Dr.
+  // Grove personally, whatever the model decided.
+  const handoff = detectDonorHandoff(`${lead.message || ''}`, brain);
+  if (handoff && parsed.verdict !== 'disqualified') {
+    parsed = {
+      ...parsed,
+      verdict: 'needs_human',
+      reason: `${handoff.reason} (Agent's read: ${parsed.reason || 'n/a'})`,
+      reply: '',
+      draftForDrGrove: parsed.reply || parsed.draftForDrGrove || '',
+      handoffTagKey: handoff.tagKey,
     };
   }
 
