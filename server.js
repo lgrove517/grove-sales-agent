@@ -14,7 +14,7 @@ const { buildBriefing, recommend } = require('./src/agents/briefing');
 const ghl = require('./src/integrations/ghl');
 const db = require('./src/store/db');
 const { startScheduler } = require('./src/scheduler/followUpScheduler');
-const { ensureCanSpamFooter, checkAdvisoryAutoSend } = require('./src/config/complianceGuard');
+const { ensureCanSpamFooter, checkAdvisoryAutoSend, checkSeparation, financialGuardsOn } = require('./src/config/complianceGuard');
 const {
   verifyCredentials,
   requireAuth,
@@ -141,8 +141,42 @@ app.get('/health', (req, res) => {
  * (first_name, contact_id, ...); a website form may send camelCase. Accept
  * both, so the agents always see a name, email and the existing GHL contact.
  */
-function isAgentTag(tag) {
-  return /^send-to-sales-agent$/i.test(tag) || /^sales-agent-/i.test(tag);
+// The tags the agent itself applies. Each client brain can rename them
+// (brain.agentTags - Village Covenant Foundation uses vcf-* tags); these
+// are the defaults Grove Financial Group uses.
+const DEFAULT_TAGS = {
+  inbound: 'sales-agent-inbound',
+  good_fit: 'sales-agent-good-fit',
+  needs_you: 'sales-agent-needs-you',
+  not_a_fit: 'sales-agent-not-a-fit',
+  handoff: 'sales-agent-needs-you',
+  plannedGift: 'sales-agent-needs-you',
+  wants_to_book: 'sales-agent-wants-to-book',
+  question: 'sales-agent-replied',
+  not_now: 'sales-agent-not-now',
+  not_interested: 'sales-agent-not-interested',
+  opted_out: 'sales-agent-opted-out',
+  booked: 'sales-agent-booked',
+  won: 'sales-agent-won',
+};
+const TAG_ALIASES = { qualified: 'good_fit', needs_human: 'needs_you', disqualified: 'not_a_fit' };
+
+function tagFor(brain, key) {
+  const k = TAG_ALIASES[key] || key;
+  return (brain && brain.agentTags && (brain.agentTags[key] || brain.agentTags[k])) || DEFAULT_TAGS[k] || null;
+}
+
+function isAgentTag(tag, brain) {
+  if (/^send-to-sales-agent$/i.test(tag) || /^sales-agent-/i.test(tag)) return true;
+  const own = Object.values((brain && brain.agentTags) || {}).map((t) => String(t).toLowerCase());
+  return own.includes(String(tag).toLowerCase());
+}
+
+/** Every outbound draft passes both checks: advisory content and the client's separation rule. */
+function checkOutbound(channel, text, brain) {
+  const advisory = checkAdvisoryAutoSend(channel, text, brain);
+  if (advisory.blocked) return advisory;
+  return checkSeparation(text, brain);
 }
 
 /**
@@ -189,7 +223,7 @@ function isDuplicateRun(contactId) {
   return false;
 }
 
-function normalizeLead(body) {
+function normalizeLead(body, brain) {
   const b = body || {};
   const c = b.contact || {};
   const cd = b.customData || b.custom_data || {};
@@ -201,7 +235,7 @@ function normalizeLead(body) {
   const allTags = (Array.isArray(b.tags) ? b.tags : String(b.tags || '').split(','))
     .map((t) => String(t).trim())
     .filter(Boolean);
-  const tags = allTags.filter((t) => !isAgentTag(t)).join(', ');
+  const tags = allTags.filter((t) => !isAgentTag(t, brain)).join(', ');
   return {
     brand: pick(b.brand, cd.brand),
     firstName: pick(b.firstName, b.first_name, c.firstName, c.first_name, cd.firstName),
@@ -218,7 +252,8 @@ function normalizeLead(body) {
 
 app.post('/webhook/lead', checkToken, async (req, res) => {
   try {
-    req.body = { ...req.body, ...normalizeLead(req.body) };
+    const brainForLead = loadBrain(normalizeLead(req.body).brand || req.query.brand);
+    req.body = { ...req.body, ...normalizeLead(req.body, brainForLead) };
     if (isDuplicateRun(req.body.ghlContactId)) {
       console.log(`Skipped duplicate webhook for contact ${req.body.ghlContactId}`);
       return res.json({ skipped: 'duplicate', contactId: req.body.ghlContactId });
@@ -317,9 +352,10 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
     let tagResult = null;
     if (ghlContactId) {
       const tags = [
-        req.body.ghlContactId ? null : 'sales-agent-inbound',
-        { qualified: 'sales-agent-good-fit', needs_human: 'sales-agent-needs-you', disqualified: 'sales-agent-not-a-fit' }[verdict.verdict],
-        verdict.suggestedTag === 'gwm-investment-inquiry' ? 'gwm-investment-inquiry' : null,
+        req.body.ghlContactId ? null : tagFor(brain, 'inbound'),
+        tagFor(brain, verdict.verdict),
+        verdict.handoffTagKey ? tagFor(brain, verdict.handoffTagKey) : null,
+        financialGuardsOn(brain) && verdict.suggestedTag === 'gwm-investment-inquiry' ? 'gwm-investment-inquiry' : null,
       ].filter(Boolean);
       try {
         tagResult = await ghl.addTags({ contactId: ghlContactId, tags });
@@ -344,8 +380,10 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
       // Nothing to send a reply to - hand it over instead of drafting one.
       db.updateLeadStatus(leadId, 'needs_human');
       await ghl.addNote({ contactId: ghlContactId, body: 'SALES AGENT: good fit, but this contact has no phone or email on file - no reply drafted. Add one and re-tag send-to-sales-agent.' }).catch(() => {});
-      await ghl.removeTags({ contactId: ghlContactId, tags: ['sales-agent-good-fit'] }).catch(() => {});
-      await ghl.addTags({ contactId: ghlContactId, tags: ['sales-agent-needs-you'] }).catch(() => {});
+      if (tagFor(brain, 'good_fit') !== tagFor(brain, 'needs_you')) {
+        await ghl.removeTags({ contactId: ghlContactId, tags: [tagFor(brain, 'good_fit')] }).catch(() => {});
+      }
+      await ghl.addTags({ contactId: ghlContactId, tags: [tagFor(brain, 'needs_you')] }).catch(() => {});
       return res.json({ leadId, ghlResult, verdict, assessmentNote, tagResult, sendResult: { held: true, reason: 'no phone or email on file' } });
     }
     if (verdict.verdict === 'qualified' && verdict.reply && ghlContactId) {
@@ -354,7 +392,7 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
       const outboundMessage = finalizeOutbound(channel, verdict.reply, brain);
       // Same code-level backstop the follow-up and appointment agents use:
       // advisory or investment-topic wording is never auto-sent.
-      const compliance = checkAdvisoryAutoSend(channel, outboundMessage, brain);
+      const compliance = checkOutbound(channel, outboundMessage, brain);
       if (compliance.blocked) {
         db.logEvent({ leadId, agent: 'leadQualifier', action: 'blocked_compliance', detail: { reason: compliance.reason }, dryRun: false });
         db.updateLeadStatus(leadId, 'needs_human');
@@ -407,14 +445,6 @@ const REPLY_LABELS = {
   not_interested: 'Not interested - closing reply drafted, follow-ups stopped',
   needs_human: 'Needs you - no reply drafted',
   opted_out: 'Asked to stop - no reply, all automated messages stopped',
-};
-const REPLY_TAGS = {
-  wants_to_book: 'sales-agent-wants-to-book',
-  question: 'sales-agent-replied',
-  not_now: 'sales-agent-not-now',
-  not_interested: 'sales-agent-not-interested',
-  needs_human: 'sales-agent-needs-you',
-  opted_out: 'sales-agent-opted-out',
 };
 const REPLY_STATUS = { not_interested: 'disqualified', needs_human: 'needs_human', opted_out: 'opted_out' };
 
@@ -474,13 +504,17 @@ app.post('/webhook/reply', checkToken, async (req, res) => {
       ].filter(Boolean).join('\n'),
     }).catch((e) => console.error('Could not add reply note:', e.message));
 
-    const tags = [REPLY_TAGS[result.intent], result.investmentTopic ? 'gwm-investment-inquiry' : null].filter(Boolean);
+    const tags = [
+      tagFor(brain, result.intent),
+      result.handoffTagKey ? tagFor(brain, result.handoffTagKey) : null,
+      result.investmentTopic && financialGuardsOn(brain) ? 'gwm-investment-inquiry' : null,
+    ].filter((t, i, a) => t && a.indexOf(t) === i);
     await ghl.addTags({ contactId: r.ghlContactId, tags }).catch((e) => console.error('Could not tag reply:', e.message));
 
     let sendResult = null;
     if (result.reply) {
       const outbound = finalizeOutbound(channel, result.reply, brain);
-      const compliance = checkAdvisoryAutoSend(channel, outbound, brain);
+      const compliance = checkOutbound(channel, outbound, brain);
       if (compliance.blocked) {
         db.updateLeadStatus(lead.id, 'needs_human');
         await ghl.addNote({ contactId: r.ghlContactId, body: `SALES AGENT: reply held, not sent\nWhy: ${compliance.reason}\n\n${outbound}` }).catch(() => {});
@@ -503,9 +537,9 @@ app.post('/webhook/reply', checkToken, async (req, res) => {
 // Status: Booked" workflow), ?status=opted_out (a "Contact DND changed" or
 // opt-out workflow), ?status=won (a won opportunity).
 const STATUS_SYNC = {
-  booked: { tag: 'sales-agent-booked', note: 'Appointment booked - automated follow-ups stopped.' },
-  won: { tag: 'sales-agent-won', note: 'Marked won - automated follow-ups stopped.' },
-  opted_out: { tag: 'sales-agent-opted-out', note: 'Opted out - no more automated messages.' },
+  booked: { note: 'Appointment booked - automated follow-ups stopped.' },
+  won: { note: 'Marked won - automated follow-ups stopped.' },
+  opted_out: { note: 'Opted out - no more automated messages.' },
 };
 
 app.post('/webhook/status', checkToken, async (req, res) => {
@@ -517,12 +551,13 @@ app.post('/webhook/status', checkToken, async (req, res) => {
     if (!STATUS_SYNC[status]) return res.status(400).json({ error: `status must be one of: ${Object.keys(STATUS_SYNC).join(', ')}` });
     if (!contactId) return res.status(400).json({ error: 'no contact id in the status webhook' });
 
+    const statusBrain = loadBrain(b.brand || req.query.brand);
     const lead = db.findLeadByGhlContactId(contactId);
     if (!lead) return res.json({ found: false, contactId, note: 'Not a contact the agent has worked - nothing to update.' });
 
     db.updateLeadStatus(lead.id, status);
     db.logEvent({ leadId: lead.id, agent: 'statusSync', action: status, detail: { contactId }, dryRun: false });
-    await ghl.addTags({ contactId, tags: [STATUS_SYNC[status].tag] }).catch((e) => console.error('Could not tag status:', e.message));
+    await ghl.addTags({ contactId, tags: [tagFor(statusBrain, status)] }).catch((e) => console.error('Could not tag status:', e.message));
     await ghl.addNote({ contactId, body: `SALES AGENT: ${STATUS_SYNC[status].note}` }).catch((e) => console.error('Could not add status note:', e.message));
     res.json({ found: true, leadId: lead.id, status });
   } catch (err) {
