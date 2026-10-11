@@ -4,6 +4,7 @@ const { draftFollowUp } = require('./followUp');
 const { handleBookingIntent } = require('./appointmentSetter');
 const { runFollowUpSweep } = require('../scheduler/followUpScheduler');
 const { buildBriefing, recommend } = require('./briefing');
+const { buildSocialCalendar } = require('./socialCalendar');
 const db = require('../store/db');
 
 const ROUTER_PROMPT = `
@@ -11,7 +12,10 @@ You are the COMMAND CENTER router for a multi-agent sales system. The
 business owner just typed one line of instruction. Classify it into exactly
 one of these intents and extract any parameters mentioned:
 
-- "draft_content": they want social posts, an email, or ad copy written
+- "social_calendar": they want a whole month (or calendar) of social posts
+  planned and scheduled, e.g. "build the December social calendar", "a month
+  of posts for January", "content calendar"
+- "draft_content": they want a few social posts, an email, or ad copy written
 - "follow_up_lead": they want a follow-up message sent/drafted to a specific
   named lead
 - "list_leads": they want to see recent leads or their status
@@ -26,7 +30,7 @@ one of these intents and extract any parameters mentioned:
 
 Output STRICT JSON only:
 {
-  "intent": "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "unknown",
+  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "unknown",
   "leadName": "name mentioned, if any, else empty string",
   "cleanedInstruction": "the instruction, lightly cleaned up, to hand to the specialist agent"
 }
@@ -44,6 +48,9 @@ function ruleBasedRoute(instruction) {
   }
   if (/(follow.?up sweep|run (the )?sweep|check (for )?(overdue|due) (leads|follow.?ups)|run scheduler)/.test(lower)) {
     return { intent: 'run_followup_sweep', leadName: '', cleanedInstruction: instruction };
+  }
+  if (/(social|content|posting|post) (media )?(calendar|schedule|plan)|month(ly)? (of|worth of) (social )?posts|monthly (social|posts)|bulk upload/.test(lower)) {
+    return { intent: 'social_calendar', leadName: '', cleanedInstruction: instruction };
   }
   if (/(post|email|ad copy|write|draft|caption)/.test(lower)) {
     return { intent: 'draft_content', leadName: '', cleanedInstruction: instruction };
@@ -90,6 +97,10 @@ async function runCommand({ brain, instruction, since }) {
   let response;
 
   switch (routed.intent) {
+    case 'social_calendar': {
+      response = await buildSocialCalendar({ brain, instruction: routed.cleanedInstruction || instruction });
+      break;
+    }
     case 'draft_content': {
       response = await draftContent({ brain, instruction: routed.cleanedInstruction });
       break;
@@ -157,12 +168,14 @@ async function runCommand({ brain, instruction, since }) {
         message:
           "I didn't recognize that as a command yet. Try things like " +
           '"what happened since my last visit?", "how can I get more appointments?", ' +
-          '"draft 3 LinkedIn posts", "follow up with Marcus", "list leads", or "run follow-up sweep".',
+          '"draft 3 LinkedIn posts", "build the December social calendar", "follow up with Marcus", "list leads", or "run follow-up sweep".',
       };
     }
   }
 
-  db.logCommand({ brand: brain.clientId, instruction, response });
+  // The calendar's CSV can be rebuilt from its rows, so don't store it twice.
+  const logged = response && response.csv ? { ...response, csv: undefined } : response;
+  db.logCommand({ brand: brain.clientId, instruction, response: logged });
   return { intent: routed.intent, dryRun: routed.dryRun, response };
 }
 
