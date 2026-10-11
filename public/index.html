@@ -169,6 +169,10 @@
   .pill.good { background: #2e7d4f; } .pill.you { background: #b1832e; } .pill.no { background: #8a3b2e; } .pill.info { background: var(--teal); }
   details.raw { margin-top: 8px; font-size: 12px; } details.raw summary { cursor: pointer; opacity: .7; }
   table.mini { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; background: #fff; }
+  table.cal td { vertical-align: top; white-space: pre-wrap; }
+  table.cal td.d { white-space: nowrap; color: #4a5a5e; }
+  table.cal .flag { margin-top: 4px; font-size: 12px; color: #8a5a00; }
+  .dl { margin-top: 10px; padding: 8px 14px; border: 0; border-radius: 6px; background: #0f7f86; color: #fff; font-size: 14px; cursor: pointer; }
   table.mini th, table.mini td { text-align: left; padding: 4px 8px; border-bottom: 1px solid rgba(0,56,64,0.12); }
 
   .briefing { grid-column: 1 / -1; border-left: 4px solid var(--gold); }
@@ -206,7 +210,7 @@
   <div class="titles">
     <h1>AI Sales Agent <span class="by">by Webtech Design</span></h1>
     <label class="client" for="brand-select">Client:
-      <select id="brand-select" aria-label="Choose client"><option value="">Grove Financial Group Inc.</option></select>
+      <select id="brand-select" aria-label="Choose client"><option value="">Loading…</option></select>
     </label>
   </div>
   <span class="status" id="status">Checking connection...</span>
@@ -232,7 +236,7 @@
   <section class="card">
     <h2>Send an instruction</h2>
     <form class="command-form" id="cmd-form">
-      <input id="cmd-input" type="text" placeholder='e.g. "draft 3 LinkedIn posts about life insurance for young families"' autocomplete="off" />
+      <input id="cmd-input" type="text" placeholder='e.g. "build the December social calendar" or "draft 3 LinkedIn posts"' autocomplete="off" />
       <button type="submit">Send</button>
     </form>
     <div class="hint">Try: "what happened since my last visit?" &middot; "how can I get more appointments?" &middot; "list leads" &middot; "list activity" &middot; "follow up with Marcus" &middot; "draft an email about Medicare planning"</div>
@@ -336,7 +340,16 @@
     const badge = result.dryRun ? '<span class="badge dry">DRY RUN</span>' : '<span class="badge">' + result.intent + '</span>';
     const r = result.response || {};
     let body;
-    if (Array.isArray(r.drafts)) {
+    if (Array.isArray(r.calendar)) {
+      body = '<div class="draft-notes">' + escapeHtml(r.notes || '') + '</div>' +
+        '<button type="button" class="dl">Download for GHL (' + escapeHtml(r.fileName || 'social.csv') + ')</button>' +
+        '<table class="mini cal"><thead><tr><th>Date</th><th>Post</th></tr></thead><tbody>' +
+        r.calendar.map(function (c) {
+          return '<tr><td class="d">' + escapeHtml(c.weekday.slice(0, 3) + ' ' + c.date) + '</td><td>' + escapeHtml(c.content) +
+            (c.link ? '<div class="flag" style="color:#4a5a5e">Link: ' + escapeHtml(c.link) + '</div>' : '') +
+            (c.flags || []).map(function (f) { return '<div class="flag">&#9888; ' + escapeHtml(f) + '</div>'; }).join('') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    } else if (Array.isArray(r.drafts)) {
       body = '';
       if (r.figuresToVerify && r.figuresToVerify.length) {
         body += '<div class="verify"><strong>Check before posting:</strong> these figures are not on your approved-facts list, so they may be made up: ' +
@@ -367,6 +380,16 @@
     }
     div.innerHTML = '<div class="instr">' + escapeHtml(instruction) + badge + '</div>' + body;
     wireTryButtons(div);
+    const dl = div.querySelector('.dl');
+    if (dl && r.csv) {
+      dl.addEventListener('click', function () {
+        const url = URL.createObjectURL(new Blob([r.csv], { type: 'text/csv;charset=utf-8' }));
+        const a = document.createElement('a');
+        a.href = url; a.download = r.fileName || 'social.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      });
+    }
     div.querySelectorAll('.copy').forEach((btn) => {
       btn.addEventListener('click', () => {
         const text = btn.parentElement.textContent.replace(/^Copy/, '');
@@ -376,7 +399,7 @@
     logEl.prepend(div);
   }
 
-  const AGENT_LABELS = { leadQualifier: 'New lead', followUp: 'Follow-up', appointmentSetter: 'Appointment', contentDrafter: 'Content drafts', ghlWebhook: 'GoHighLevel event' };
+  const AGENT_LABELS = { leadQualifier: 'New lead', followUp: 'Follow-up', appointmentSetter: 'Appointment', contentDrafter: 'Content drafts', socialCalendar: 'Social calendar', ghlWebhook: 'GoHighLevel event' };
   const ACTION_LABELS = {
     qualified: ['Good fit - reply drafted', 'good'],
     needs_human: ['Needs you', 'you'],
