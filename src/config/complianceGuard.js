@@ -128,16 +128,39 @@ const MEDICARE_PLAN_KEYWORDS = [
   'medigap',
 ];
 
+// Fallback only, for a brain with no medicareDisclaimer config. CMS now
+// expects the version with exact organization/product counts, which a brain
+// supplies per county (see config/grove-financial.json medicareDisclaimer).
 const TPMO_DISCLAIMER =
   'We do not offer every plan available in your area. Any information we provide is limited to those plans we do offer in your area. Please contact Medicare.gov or 1-800-MEDICARE to get information on all of your options.';
 
+/** First 5 digits of the lead's ZIP code, whatever shape the lead object is in. */
+function leadZip(lead) {
+  const raw = lead && (lead.postalCode || lead.postal_code || lead.zip || lead.zipCode);
+  const m = String(raw || '').match(/\d{5}/);
+  return m ? m[0] : null;
+}
+
+/** The brain's area entry (e.g. Mobile County) for this lead's ZIP, or null. */
+function medicareAreaFor(brain, lead) {
+  const zip = leadZip(lead);
+  const areas = brain?.medicareDisclaimer?.areas || [];
+  return zip ? areas.find((a) => (a.zips || []).includes(zip)) || null : null;
+}
+
 /**
- * Returns { messageText, disclaimerAppended: boolean }. Only touches the
- * message if it actually names a specific Medicare plan type AND doesn't
- * already carry the disclaimer language (checked by a distinctive phrase
- * from the disclaimer itself, so re-running this is a no-op).
+ * Returns { messageText, disclaimerAppended, needsArea?, reason? }. Only acts
+ * when the message names a specific Medicare plan type and doesn't already
+ * carry the disclaimer (re-running is a no-op).
+ *
+ * With a brain that has medicareDisclaimer config:
+ *  - a lead in a listed area gets that county's exact-count disclaimer;
+ *  - a lead outside the listed areas (or with no ZIP on file) gets nothing
+ *    appended and needsArea: true - callers hold that draft for Dr. Grove,
+ *    because the counts can't be stated correctly for that person;
+ *  - no lead at all (social posts) gets the brain's generalText.
  */
-function ensureMedicareDisclaimer(messageText) {
+function ensureMedicareDisclaimer(messageText, { brain, lead } = {}) {
   const text = messageText || '';
   const lower = text.toLowerCase();
   const mentionsMedicarePlan = MEDICARE_PLAN_KEYWORDS.some((kw) => lower.includes(kw));
@@ -147,8 +170,30 @@ function ensureMedicareDisclaimer(messageText) {
     return { messageText: text, disclaimerAppended: false };
   }
 
+  const cfg = brain?.medicareDisclaimer;
+  let disclaimer = TPMO_DISCLAIMER;
+  if (cfg && lead) {
+    const area = medicareAreaFor(brain, lead);
+    if (!area) {
+      const zip = leadZip(lead);
+      return {
+        messageText: text,
+        disclaimerAppended: false,
+        needsArea: true,
+        reason: zip
+          ? `Draft discusses Medicare plans, but ZIP ${zip} is outside the areas with plan counts on file (${cfg.areas.map((a) => a.name).join(', ')}). Held for Dr. Grove.`
+          : `Draft discusses Medicare plans, but no ZIP code is on file for this lead, so the required plan-count disclaimer can't be filled in. Held for Dr. Grove.`,
+      };
+    }
+    disclaimer = cfg.template
+      .replace('{organizations}', area.organizations)
+      .replace('{products}', area.products);
+  } else if (cfg && cfg.generalText) {
+    disclaimer = cfg.generalText;
+  }
+
   return {
-    messageText: `${text}\n\n${TPMO_DISCLAIMER}`,
+    messageText: `${text}\n\n${disclaimer}`,
     disclaimerAppended: true,
   };
 }
@@ -246,6 +291,8 @@ module.exports = {
   detectInvestmentTopic,
   INVESTMENT_TOPIC_PATTERNS,
   ensureMedicareDisclaimer,
+  medicareAreaFor,
+  leadZip,
   TPMO_DISCLAIMER,
   MEDICARE_PLAN_KEYWORDS,
   ensureCanSpamFooter,
