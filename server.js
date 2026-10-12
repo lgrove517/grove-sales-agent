@@ -244,6 +244,7 @@ function normalizeLead(body, brain) {
     email: pick(b.email, c.email, cd.email),
     phone: pick(b.phone, c.phone, cd.phone),
     state: pick(b.state, c.state, cd.state),
+    postalCode: pick(b.postalCode, b.postal_code, c.postalCode, c.postal_code, cd.postalCode, cd.postal_code, b.zip, cd.zip),
     source: pick(b.source, b.contact_source, cd.source, 'gohighlevel'),
     message: pick(b.message, cd.message),
     context: tags ? `Existing GoHighLevel tags on this contact: ${tags}` : undefined,
@@ -271,6 +272,7 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
       phone: req.body.phone,
       source: req.body.source || 'website_form',
       state: req.body.state,
+      postalCode: req.body.postalCode,
     });
 
     // Push the lead into GHL right away (create/update contact) so it's
@@ -303,6 +305,7 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
         email: req.body.email,
         phone: req.body.phone,
         state: req.body.state,
+        postalCode: req.body.postalCode,
         source: req.body.source,
         message: req.body.message,
         context: req.body.context,
@@ -436,6 +439,7 @@ function normalizeReply(body) {
     email: pick(b.email, c.email),
     phone: pick(b.phone, c.phone),
     state: pick(b.state, c.state),
+    postalCode: pick(b.postalCode, b.postal_code, c.postalCode, c.postal_code, cd.postalCode, cd.postal_code),
   };
 }
 
@@ -479,10 +483,11 @@ app.post('/webhook/reply', checkToken, async (req, res) => {
 
     let lead = db.findLeadByGhlContactId(r.ghlContactId);
     if (!lead) {
-      const id = db.insertLead({ brand: brain.clientId, firstName: r.firstName, lastName: r.lastName, email: r.email, phone: r.phone, source: 'reply', state: r.state, status: 'active', ghlContactId: r.ghlContactId });
+      const id = db.insertLead({ brand: brain.clientId, firstName: r.firstName, lastName: r.lastName, email: r.email, phone: r.phone, source: 'reply', state: r.state, postalCode: r.postalCode, status: 'active', ghlContactId: r.ghlContactId });
       lead = db.getLead(id);
     }
-    const leadInfo = { id: lead.id, firstName: lead.first_name || r.firstName, lastName: lead.last_name || r.lastName, ghlContactId: r.ghlContactId };
+    const leadInfo = { id: lead.id, firstName: lead.first_name || r.firstName, lastName: lead.last_name || r.lastName, ghlContactId: r.ghlContactId, postalCode: r.postalCode || lead.postal_code };
+    if (r.postalCode && !lead.postal_code) db.setLeadPostalCode(lead.id, r.postalCode);
 
     // Someone who already opted out and writes again (often "START" or a
     // question) is for Dr. Grove to handle personally - never automated.
@@ -639,6 +644,7 @@ app.post('/webhook/ghl', checkToken, async (req, res) => {
           id: req.body.leadId || null,
           firstName: req.body.firstName || req.body.contact?.firstName,
           ghlContactId: req.body.contactId || req.body.contact?.id,
+          postalCode: req.body.postalCode || req.body.postal_code || req.body.contact?.postalCode || req.body.contact?.postal_code,
         },
         context: JSON.stringify(req.body),
       });
