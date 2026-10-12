@@ -30,6 +30,7 @@ function shapeLead(row) {
     email: row.email,
     phone: row.phone,
     state: row.state,
+    postalCode: row.postal_code,
     status: row.status,
     ghlContactId: row.ghl_contact_id,
   };
