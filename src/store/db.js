@@ -67,11 +67,15 @@ if (!leadColumns.includes('follow_up_attempt')) {
 if (!leadColumns.includes('next_follow_up_at')) {
   db.exec(`ALTER TABLE leads ADD COLUMN next_follow_up_at TEXT`);
 }
+// ZIP code: picks the right county for the Medicare plan-count disclaimer.
+if (!leadColumns.includes('postal_code')) {
+  db.exec(`ALTER TABLE leads ADD COLUMN postal_code TEXT`);
+}
 
 function insertLead(lead) {
   const stmt = db.prepare(`
-    INSERT INTO leads (brand, first_name, last_name, email, phone, source, state, status, ghl_contact_id)
-    VALUES (@brand, @firstName, @lastName, @email, @phone, @source, @state, @status, @ghlContactId)
+    INSERT INTO leads (brand, first_name, last_name, email, phone, source, state, postal_code, status, ghl_contact_id)
+    VALUES (@brand, @firstName, @lastName, @email, @phone, @source, @state, @postalCode, @status, @ghlContactId)
   `);
   const info = stmt.run({
     brand: lead.brand,
@@ -81,6 +85,7 @@ function insertLead(lead) {
     phone: lead.phone || null,
     source: lead.source || null,
     state: lead.state || null,
+    postalCode: lead.postalCode || null,
     status: lead.status || 'new',
     ghlContactId: lead.ghlContactId || null,
   });
@@ -106,6 +111,11 @@ function supersedeOlderLeads(ghlContactId, keepLeadId) {
   return db
     .prepare(`UPDATE leads SET status = 'superseded' WHERE ghl_contact_id = ? AND id != ? AND status NOT IN ('superseded','opted_out','booked','won')`)
     .run(ghlContactId, keepLeadId).changes;
+}
+
+/** Fill in a lead's ZIP when a later webhook (e.g. a reply) carries it. */
+function setLeadPostalCode(leadId, postalCode) {
+  db.prepare(`UPDATE leads SET postal_code = ? WHERE id = ?`).run(postalCode || null, leadId);
 }
 
 function getLead(leadId) {
@@ -257,6 +267,7 @@ function pipelineStats(brand, days = 30) {
 }
 
 module.exports = {
+  setLeadPostalCode,
   toDbTime,
   getLastVisit,
   setLastVisit,
