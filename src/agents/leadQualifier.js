@@ -111,7 +111,18 @@ async function qualifyLead({ brain, lead }) {
   // Federal backstop: if the first-touch reply names a specific Medicare
   // plan type, make sure the required CMS disclaimer is attached.
   if (parsed.reply) {
-    parsed.reply = ensureMedicareDisclaimer(parsed.reply).messageText;
+    const medicare = ensureMedicareDisclaimer(parsed.reply, { brain, lead });
+    if (medicare.needsArea) {
+      parsed = {
+        ...parsed,
+        verdict: 'needs_human',
+        reason: `${medicare.reason} (Agent's read: ${parsed.reason || 'n/a'})`,
+        reply: '',
+        draftForDrGrove: parsed.reply,
+      };
+    } else {
+      parsed.reply = medicare.messageText;
+    }
   }
 
   db.logEvent({

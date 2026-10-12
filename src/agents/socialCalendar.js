@@ -115,7 +115,7 @@ async function buildSocialCalendar({ brain, instruction }) {
     const figures = findUnapprovedFigures([content], brain);
     if (figures.length) flags.push(`Check these figures before posting: ${figures.join(', ')}.`);
     if (/\[[^\]]*\]/.test(content)) flags.push('Has a [placeholder] to fill in.');
-    content = ensureMedicareDisclaimer(content).messageText;
+    content = ensureMedicareDisclaimer(content, { brain }).messageText;
     return {
       date: d.date,
       weekday: d.weekday,

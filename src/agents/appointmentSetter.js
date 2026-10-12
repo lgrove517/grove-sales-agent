@@ -49,8 +49,12 @@ async function handleBookingIntent({ brain, lead, context }) {
     }
   }
 
-  const medicare = ensureMedicareDisclaimer(parsed.message);
+  const medicare = ensureMedicareDisclaimer(parsed.message, { brain, lead });
   parsed.message = medicare.messageText;
+  if (medicare.needsArea) {
+    parsed.action = 'escalate';
+    parsed.reason = medicare.reason;
+  }
 
   const compliance = checkSmsCompliance('SMS', parsed.message, brain);
   if (compliance.blocked) {

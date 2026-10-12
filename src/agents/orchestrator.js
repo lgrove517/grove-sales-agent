@@ -120,7 +120,7 @@ async function runCommand({ brain, instruction, since }) {
       } else {
         response = await draftFollowUp({
           brain,
-          lead: { id: lead.id, firstName: lead.first_name, ghlContactId: lead.ghl_contact_id },
+          lead: { id: lead.id, firstName: lead.first_name, ghlContactId: lead.ghl_contact_id, postalCode: lead.postal_code },
           attemptNumber: 1,
           channel: lead.phone ? 'SMS' : 'Email',
           context: routed.cleanedInstruction,

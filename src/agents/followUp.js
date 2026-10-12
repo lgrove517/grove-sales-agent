@@ -59,8 +59,12 @@ async function draftFollowUp({ brain, lead, attemptNumber, channel = 'SMS', cont
   // Federal backstop: if this message names a specific Medicare plan type,
   // make sure the required CMS disclaimer is on it, whether or not the
   // model remembered to include it.
-  const medicare = ensureMedicareDisclaimer(parsed.message);
+  const medicare = ensureMedicareDisclaimer(parsed.message, { brain, lead });
   parsed.message = medicare.messageText;
+  if (medicare.needsArea) {
+    parsed.shouldSend = false;
+    parsed.reason = medicare.reason;
+  }
 
   // CAN-SPAM requires a physical mailing address on commercial email -
   // no-op for SMS or if the brain has no mailingAddress on file.

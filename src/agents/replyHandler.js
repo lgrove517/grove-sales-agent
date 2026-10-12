@@ -118,7 +118,19 @@ async function handleReply({ brain, lead, replyText, channel, context }) {
   }
 
   if (parsed.intent === 'needs_human') parsed.reply = '';
-  if (parsed.reply) parsed.reply = ensureMedicareDisclaimer(parsed.reply).messageText;
+  if (parsed.reply) {
+    const medicare = ensureMedicareDisclaimer(parsed.reply, { brain, lead });
+    if (medicare.needsArea) {
+      parsed = {
+        intent: 'needs_human',
+        reason: `${medicare.reason} (Agent's read: ${parsed.reason || 'n/a'})`,
+        reply: '',
+        draftForDrGrove: parsed.reply,
+      };
+    } else {
+      parsed.reply = medicare.messageText;
+    }
+  }
 
   db.logEvent({ leadId: lead.id, agent: 'replyHandler', action: parsed.intent, detail: { replyText: text, channel, ...parsed }, dryRun: result.dryRun });
   return { ...parsed, dryRun: result.dryRun };
