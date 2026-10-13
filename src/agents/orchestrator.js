@@ -5,7 +5,21 @@ const { handleBookingIntent } = require('./appointmentSetter');
 const { runFollowUpSweep } = require('../scheduler/followUpScheduler');
 const { buildBriefing, recommend } = require('./briefing');
 const { buildSocialCalendar } = require('./socialCalendar');
+const { buildMonthlyReport } = require('./monthlyReport');
+const { hasFeature, lockedMessage } = require('../config/packages');
 const db = require('../store/db');
+
+// Which package feature each command needs (see src/config/packages.js).
+// list_leads and list_activity are open to every package.
+const INTENT_FEATURE = {
+  social_calendar: 'socialCalendar',
+  draft_content: 'content',
+  follow_up_lead: 'aiFollowUp',
+  run_followup_sweep: 'aiFollowUp',
+  briefing: 'briefing',
+  recommendations: 'recommendations',
+  monthly_report: 'monthlyReport',
+};
 
 const ROUTER_PROMPT = `
 You are the COMMAND CENTER router for a multi-agent sales system. The
@@ -26,11 +40,13 @@ one of these intents and extract any parameters mentioned:
   last session / while they were away ("what did I miss?")
 - "recommendations": they want advice or ideas on how to get more leads,
   more booked appointments, or grow the pipeline
+- "monthly_report": they want the monthly results report / numbers for a
+  month, e.g. "monthly report", "September results", "report for this month"
 - "unknown": doesn't clearly match any of the above
 
 Output STRICT JSON only:
 {
-  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "unknown",
+  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "unknown",
   "leadName": "name mentioned, if any, else empty string",
   "cleanedInstruction": "the instruction, lightly cleaned up, to hand to the specialist agent"
 }
@@ -40,6 +56,9 @@ Output STRICT JSON only:
  * command center still does something sensible without a live LLM call. */
 function ruleBasedRoute(instruction) {
   const lower = instruction.toLowerCase();
+  if (/(monthly (results|report|summary)|results (report|summary)|^(show |get |run )?(the |my )?report for\b|\b(results|numbers) for (this|last) month|\b(january|february|march|april|may|june|july|august|september|october|november|december) (results|report|numbers)\b)/.test(lower)) {
+    return { intent: 'monthly_report', leadName: '', cleanedInstruction: instruction };
+  }
   if (/(since (my|the) last|last (visit|session|login|time)|what did i miss|while i was (away|gone|out)|catch me up|\bbriefing\b)/.test(lower)) {
     return { intent: 'briefing', leadName: '', cleanedInstruction: instruction };
   }
@@ -96,7 +115,19 @@ async function runCommand({ brain, instruction, since }) {
   const routed = await classifyIntent(instruction);
   let response;
 
+  // Package check before any AI call: a locked command does nothing.
+  const feature = INTENT_FEATURE[routed.intent];
+  if (feature && !hasFeature(brain, feature)) {
+    response = { locked: true, message: lockedMessage(brain, feature) };
+    db.logCommand({ brand: brain.clientId, instruction, response });
+    return { intent: routed.intent, dryRun: routed.dryRun, response };
+  }
+
   switch (routed.intent) {
+    case 'monthly_report': {
+      response = buildMonthlyReport({ brain, instruction: routed.cleanedInstruction || instruction });
+      break;
+    }
     case 'social_calendar': {
       response = await buildSocialCalendar({ brain, instruction: routed.cleanedInstruction || instruction });
       break;
@@ -168,7 +199,7 @@ async function runCommand({ brain, instruction, since }) {
         message:
           "I didn't recognize that as a command yet. Try things like " +
           '"what happened since my last visit?", "how can I get more appointments?", ' +
-          '"draft 3 LinkedIn posts", "build the December social calendar", "follow up with Marcus", "list leads", or "run follow-up sweep".',
+          '"draft 3 LinkedIn posts", "build the December social calendar", "monthly report", "follow up with Marcus", "list leads", or "run follow-up sweep".',
       };
     }
   }
