@@ -212,6 +212,15 @@
     <label class="client" for="brand-select">Client:
       <select id="brand-select" aria-label="Choose client"><option value="">Loading…</option></select>
     </label>
+    <label class="client" for="package-select">Package:
+      <select id="package-select" aria-label="Client's package" title="What the AI Sales Agent does for this client">
+        <option value="internal">Internal (all features)</option>
+        <option value="premium">Premium - AI works leads</option>
+        <option value="growth">Growth - AI writes marketing</option>
+        <option value="starter">Starter - no AI</option>
+        <option value="canceled">Canceled - AI paused</option>
+      </select>
+    </label>
   </div>
   <span class="status" id="status">Checking connection...</span>
   <span class="spacer"></span>
@@ -239,7 +248,7 @@
       <input id="cmd-input" type="text" placeholder='e.g. "build the December social calendar" or "draft 3 LinkedIn posts"' autocomplete="off" />
       <button type="submit">Send</button>
     </form>
-    <div class="hint">Try: "what happened since my last visit?" &middot; "how can I get more appointments?" &middot; "list leads" &middot; "list activity" &middot; "follow up with Marcus" &middot; "draft an email about Medicare planning"</div>
+    <div class="hint">Try: "what happened since my last visit?" &middot; "how can I get more appointments?" &middot; "monthly report" &middot; "list leads" &middot; "list activity" &middot; "follow up with Marcus" &middot; "draft an email about Medicare planning"</div>
     <div class="log" id="log"></div>
   </section>
 
@@ -260,6 +269,7 @@
   const form = document.getElementById('cmd-form');
   const input = document.getElementById('cmd-input');
   const brandSelect = document.getElementById('brand-select');
+  const packageSelect = document.getElementById('package-select');
 
   // Which client the command center is working for. Remembered per browser.
   function currentBrand() { return brandSelect.value || ''; }
@@ -283,6 +293,24 @@
     } catch {}
   }
 
+  // Set a client's package by hand (Stripe also sets it on purchase).
+  packageSelect.addEventListener('change', async function () {
+    try {
+      const res = await fetch('/api/package', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ brand: currentBrand() || undefined, package: packageSelect.value }),
+      });
+      if (redirectIfSignedOut(res)) return;
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+    } catch (err) {
+      addLogEntry('Change package', { response: { error: String(err.message || err) } });
+    }
+    refreshStatus();
+    refreshBriefing();
+  });
+
   brandSelect.addEventListener('change', function () {
     try { localStorage.setItem('salesAgentBrand', currentBrand()); } catch {}
     refreshStatus();
@@ -294,11 +322,13 @@
     try {
       const res = await fetch('/health' + brandQuery());
       const data = await res.json();
+      if (data.package) packageSelect.value = data.package.key;
       statusEl.innerHTML =
         '<span class="dot ' + (data.anthropicConfigured ? 'on' : 'off') + '"></span>Claude: ' +
         (data.anthropicConfigured ? 'live' : 'dry-run') +
         '  &nbsp; <span class="dot ' + (data.ghlConfigured ? 'on' : 'off') + '"></span>GoHighLevel: ' +
         (data.ghlConfigured ? (data.ghlSendMode === 'live' ? 'live (sending)' : 'connected (review mode: drafts only, nothing is sent)') : 'dry-run') +
+        (data.package ? '  &nbsp; Package: <b>' + escapeHtml(data.package.label) + '</b>' : '') +
         (data.workflows || []).map(function (w) {
           return '  &nbsp; <span class="dot ' + (w.enabled ? 'on' : 'off') + '"></span>' +
             escapeHtml(w.name) + ': ' + (w.enabled ? 'on' : 'off (awaiting compliance)');
@@ -340,7 +370,22 @@
     const badge = result.dryRun ? '<span class="badge dry">DRY RUN</span>' : '<span class="badge">' + result.intent + '</span>';
     const r = result.response || {};
     let body;
-    if (Array.isArray(r.calendar)) {
+    if (r.locked) {
+      body = '<div class="verify"><strong>Not in this package:</strong> ' + escapeHtml(r.message || '') +
+        ' Change the package at the top of the page if the client has upgraded.</div>';
+    } else if (r.monthlyReport) {
+      body = '<div class="why"><strong>' + escapeHtml(r.summary) + '</strong></div>' +
+        (r.sections || []).map(function (sec) {
+          return '<table class="mini"><thead><tr><th>' + escapeHtml(sec.title) + '</th><th></th></tr></thead><tbody>' +
+            sec.rows.map(function (row) {
+              return '<tr><td>' + escapeHtml(row[0]).replace(/^  /, '&nbsp;&nbsp;&nbsp;') + '</td><td><b>' + escapeHtml(row[1]) + '</b></td></tr>';
+            }).join('') + '</tbody></table>';
+        }).join('') +
+        '<div class="draft-head">Ready to send to the client</div>' +
+        '<div class="draft"><button type="button" class="copy">Copy</button>' + escapeHtml(r.clientText || '') + '</div>';
+    } else if (typeof r.message === 'string' && Object.keys(r).length === 1) {
+      body = '<div class="card">' + escapeHtml(r.message) + '</div>';
+    } else if (Array.isArray(r.calendar)) {
       body = '<div class="draft-notes">' + escapeHtml(r.notes || '') + '</div>' +
         '<button type="button" class="dl">Download for GHL (' + escapeHtml(r.fileName || 'social.csv') + ')</button>' +
         '<table class="mini cal"><thead><tr><th>Date</th><th>Post</th></tr></thead><tbody>' +
@@ -408,7 +453,7 @@
     blocked_sms_compliance: ['Held for you - compliance', 'you'],
     draft: ['Drafted', 'info'],
   };
-  const STATUS_LABELS = { new: 'New', active: 'Active', needs_human: 'Needs you', disqualified: 'Not a fit', superseded: 'Replaced by newer copy', opted_out: 'Opted out', booked: 'Booked', won: 'Client' };
+  const STATUS_LABELS = { new: 'New', active: 'Active', needs_human: 'Needs you', disqualified: 'Not a fit', superseded: 'Replaced by newer copy', opted_out: 'Opted out', booked: 'Booked', won: 'Client', logged: 'Logged (not worked - package)' };
 
   // Database times are UTC ("2026-10-02 13:47:39"); show them in local time.
   function when(ts) {
