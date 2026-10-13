@@ -15,6 +15,7 @@ const ghl = require('./src/integrations/ghl');
 const db = require('./src/store/db');
 const { startScheduler } = require('./src/scheduler/followUpScheduler');
 const { ensureCanSpamFooter, checkAdvisoryAutoSend, checkSeparation, financialGuardsOn } = require('./src/config/complianceGuard');
+const packages = require('./src/config/packages');
 const {
   verifyCredentials,
   requireAuth,
@@ -130,6 +131,9 @@ app.get('/health', (req, res) => {
     clientName: (() => { try { return loadBrain(brand).businessName; } catch { return null; } })(),
     // Compliance-gated workflows and whether each is switched on.
     workflows: (() => { try { return loadBrain(brand).workflowStatus || []; } catch { return []; } })(),
+    // The client's Webtech package and which agent features it turns on.
+    package: (() => { try { return packages.packageFor(loadBrain(brand)); } catch { return null; } })(),
+    features: (() => { try { return packages.featureStatus(loadBrain(brand)); } catch { return []; } })(),
   });
 });
 
@@ -263,6 +267,22 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
     const brand = req.body.brand || req.query.brand;
     const brain = loadBrain(brand);
     const channel = req.body.phone ? 'SMS' : 'Email';
+
+    // Package check: below Premium the lead is recorded (it counts in the
+    // monthly report) but never assessed, drafted or followed up.
+    if (!packages.hasFeature(brain, 'leadAgent')) {
+      const reason = packages.lockedMessage(brain, 'leadAgent');
+      const leadId = db.insertLead({
+        brand: brain.clientId, firstName: req.body.firstName, lastName: req.body.lastName, email: req.body.email,
+        phone: req.body.phone, source: req.body.source || 'website_form', state: req.body.state, postalCode: req.body.postalCode,
+        status: 'logged', ghlContactId: req.body.ghlContactId,
+      });
+      db.logEvent({ leadId, agent: 'package', action: 'lead_logged', detail: { reason }, dryRun: false });
+      if (req.body.ghlContactId) {
+        await ghl.removeTags({ contactId: req.body.ghlContactId, tags: ['send-to-sales-agent'] }).catch(() => {});
+      }
+      return res.json({ leadId, skipped: 'package', reason });
+    }
 
     const leadId = db.insertLead({
       brand: brain.clientId,
@@ -479,6 +499,9 @@ app.post('/webhook/reply', checkToken, async (req, res) => {
       console.warn('Reply webhook with no message text. Keys received:', Object.keys(req.body || {}).join(', '));
     }
     const brain = loadBrain(req.body.brand || req.query.brand);
+    if (!packages.hasFeature(brain, 'replyAgent')) {
+      return res.json({ skipped: 'package', reason: packages.lockedMessage(brain, 'replyAgent'), contactId: r.ghlContactId });
+    }
     const channel = /mail/i.test(r.rawChannel) ? 'Email' : /sms|text|phone/i.test(r.rawChannel) ? 'SMS' : (r.phone ? 'SMS' : 'Email');
 
     let lead = db.findLeadByGhlContactId(r.ghlContactId);
@@ -544,6 +567,18 @@ app.post('/webhook/reply', checkToken, async (req, res) => {
 // webtech-design); GHL workflows on those tags send the emails.
 const stripeHook = require('./src/integrations/stripeWebhook');
 
+/** Client brains on this deployment whose billingEmail matches (case-insensitive). */
+function clientsByBillingEmail(email) {
+  const want = String(email || '').trim().toLowerCase();
+  if (!want) return [];
+  const fs = require('fs');
+  const { CONFIG_DIR } = require('./src/config/loadBrain');
+  return fs.readdirSync(CONFIG_DIR)
+    .filter((f) => f.endsWith('.json') && !f.startsWith('brain.example'))
+    .map((f) => { try { return loadBrain(f.replace(/\.json$/, '')); } catch { return null; } })
+    .filter((b) => b && [].concat(b.billingEmail || []).some((e) => String(e).trim().toLowerCase() === want));
+}
+
 app.post('/webhook/stripe', async (req, res) => {
   const check = stripeHook.verifySignature(req.rawBody, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
   if (!check.ok) {
@@ -570,6 +605,18 @@ app.post('/webhook/stripe', async (req, res) => {
       console.warn(`Stripe webhook: ${event.type} ${event.id} has no customer email - nothing to tag.`);
       stripeHook.markHandled(event.id);
       return res.json({ received: true, ignored: 'no customer email' });
+    }
+
+    // Package sync: the client whose brain lists this billing email gets the
+    // package they just bought, upgraded to, or lost on cancellation.
+    if (action.packageChange) {
+      const clients = clientsByBillingEmail(action.email);
+      const label = packages.LEVELS[action.packageChange].label;
+      clients.forEach((c) => packages.setClientPackage(c.clientId, action.packageChange, `stripe ${event.type}`));
+      action.note = [action.note, clients.length
+        ? `AI Sales Agent package for ${clients.map((c) => c.businessName || c.clientId).join(', ')} is now: ${label}.`
+        : `AI Sales Agent package NOT changed: no client brain lists ${action.email} as its billing email. Add "billingEmail" to their config file, or set the package by hand.`,
+      ].filter(Boolean).join('\n');
     }
 
     const result = await ghl.runWithBrain(brain, async () => {
@@ -614,6 +661,9 @@ app.post('/webhook/status', checkToken, async (req, res) => {
     if (!contactId) return res.status(400).json({ error: 'no contact id in the status webhook' });
 
     const statusBrain = loadBrain(b.brand || req.query.brand);
+    if (!packages.hasFeature(statusBrain, 'statusSync')) {
+      return res.json({ skipped: 'package', reason: packages.lockedMessage(statusBrain, 'statusSync'), contactId });
+    }
     const lead = db.findLeadByGhlContactId(contactId);
     if (!lead) return res.json({ found: false, contactId, note: 'Not a contact the agent has worked - nothing to update.' });
 
@@ -638,6 +688,9 @@ app.post('/webhook/ghl', checkToken, async (req, res) => {
     const eventType = req.body.type || req.body.event || 'unknown';
 
     if (eventType.toLowerCase().includes('appointment') || eventType.toLowerCase().includes('booking')) {
+      if (!packages.hasFeature(brain, 'appointmentSetter')) {
+        return res.json({ skipped: 'package', reason: packages.lockedMessage(brain, 'appointmentSetter') });
+      }
       const result = await handleBookingIntent({
         brain,
         lead: {
@@ -699,6 +752,9 @@ function briefingSince(req, brand) {
 app.get('/api/briefing', requireAuth, (req, res) => {
   try {
     const brain = loadBrain(req.query.brand);
+    if (!packages.hasFeature(brain, 'briefing')) {
+      return res.status(403).json({ locked: true, error: packages.lockedMessage(brain, 'briefing') });
+    }
     const since = briefingSince(req, brain.clientId);
     const briefing = buildBriefing({ brain, since });
     briefing.firstVisit = Boolean(req.session.firstVisit && req.session.firstVisit[brain.clientId]);
@@ -712,6 +768,9 @@ app.get('/api/briefing', requireAuth, (req, res) => {
 app.post('/api/recommendations', requireAuth, async (req, res) => {
   try {
     const brain = loadBrain(req.body.brand);
+    if (!packages.hasFeature(brain, 'recommendations')) {
+      return res.json({ intent: 'recommendations', response: { locked: true, message: packages.lockedMessage(brain, 'recommendations') } });
+    }
     const result = await recommend({ brain, focus: req.body.focus || '' });
     db.logCommand({ brand: brain.clientId, instruction: '(button) Get recommendations', response: result });
     res.json({ intent: 'recommendations', dryRun: result.dryRun, response: result });
@@ -731,10 +790,27 @@ app.get('/api/brains', requireAuth, (req, res) => {
     .filter((f) => f.endsWith('.json') && !f.startsWith('brain.example'))
     .map((f) => {
       const id = f.replace(/\.json$/, '');
-      try { return { id, name: loadBrain(id).businessName || id }; } catch { return null; }
+      try {
+        const b = loadBrain(id);
+        return { id, name: b.businessName || id, package: packages.packageFor(b).label };
+      } catch { return null; }
     })
     .filter(Boolean);
   res.json({ brains, defaultBrain: process.env.DEFAULT_BRAIN || 'grove-financial' });
+});
+
+// Set a client's package by hand from the dashboard (Stripe sets it too).
+app.post('/api/package', requireAuth, (req, res) => {
+  try {
+    const brain = loadBrain(req.body.brand);
+    if (!packages.setClientPackage(brain.clientId, req.body.package, `set by ${req.session.username || 'dashboard'}`)) {
+      return res.status(400).json({ error: `package must be one of: ${Object.keys(packages.LEVELS).join(', ')}` });
+    }
+    db.logEvent({ agent: 'package', action: 'set', detail: { brand: brain.clientId, package: req.body.package }, dryRun: false });
+    res.json({ brand: brain.clientId, package: packages.packageFor(brain) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/leads', requireAuth, (req, res) => {
