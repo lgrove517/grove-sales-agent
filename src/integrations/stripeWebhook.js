@@ -1,3 +1,4 @@
+const { packageForPlanKey } = require('../config/packages');
 const crypto = require('crypto');
 const { db } = require('../store/db');
 
@@ -126,6 +127,8 @@ function eventToAction(event, brain) {
         o.subscription ? `Subscription: ${o.subscription}` : '',
         isUpgrade ? 'Next: switch their subscription to the new monthly plan in Stripe (Update subscription).' : 'Next: onboarding email goes out from the GHL workflow on the paid tag.',
       ].filter(Boolean).join('\n'),
+      // starter / growth / premium - the AI Sales Agent package this buys.
+      packageChange: plan ? packageForPlanKey(plan.key) : null,
     };
   }
 
@@ -167,6 +170,7 @@ function eventToAction(event, brain) {
       addTags: [T.canceled].filter(Boolean),
       removeTags: [T.current, T.paymentFailed].filter(Boolean),
       note: `STRIPE: Subscription ENDED${o.cancellation_details?.reason ? ` (${o.cancellation_details.reason.replace(/_/g, ' ')})` : ''}.\nNext: pause their services and reach out personally.`,
+      packageChange: 'canceled',
     };
   }
 
