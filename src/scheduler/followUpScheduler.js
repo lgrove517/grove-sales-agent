@@ -13,6 +13,7 @@ const { loadBrain } = require('../config/loadBrain');
 const { draftFollowUp } = require('../agents/followUp');
 const ghl = require('../integrations/ghl');
 const db = require('../store/db');
+const { hasFeature, lockedMessage } = require('../config/packages');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -20,7 +21,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // scheduler should never touch them again.
 // needs_human: Dr. Grove handles these himself - no automated nurture.
 // superseded: an older copy of a contact that was re-sent to the agent.
-const TERMINAL_STATUSES = ['disqualified', 'needs_human', 'superseded', 'opted_out', 'booked', 'won'];
+// logged: a lead recorded for a client whose package doesn't include the
+// lead agents (Starter/Growth) - counted in reports, never worked, even
+// after an upgrade.
+const TERMINAL_STATUSES = ['disqualified', 'needs_human', 'superseded', 'opted_out', 'booked', 'won', 'logged'];
 
 function shapeLead(row) {
   return {
@@ -78,6 +82,9 @@ async function sweepForBrain(brain) {
 
   if (!followUpCfg.enabled) {
     return { ran: false, reason: 'followUp agent disabled for this brain', brand: brain.clientId, processed: [] };
+  }
+  if (!hasFeature(brain, 'aiFollowUp')) {
+    return { ran: false, reason: lockedMessage(brain, 'aiFollowUp'), brand: brain.clientId, processed: [] };
   }
 
   const cadenceDays = followUpCfg.cadenceDays?.length ? followUpCfg.cadenceDays : [1, 3, 7, 14];
