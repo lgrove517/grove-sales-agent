@@ -8,6 +8,10 @@
   "phone": "",
   "bookingLink": "",
 
+  "_packageNote": "Webtech package for this client: starter (no AI), growth (AI writes marketing), premium (AI also works leads). Leave package out for Dr. Grove's own organizations - they keep every feature. Stripe updates the package automatically when a payment's email matches billingEmail; it can also be changed from the dashboard.",
+  "package": "starter",
+  "billingEmail": "owner@example.com",
+
   "voice": {
     "tone": "Warm, direct, no hard-sell pressure. Short sentences. Talk like a knowledgeable person, not a brochure.",
     "readingLevel": "8th-9th grade",
