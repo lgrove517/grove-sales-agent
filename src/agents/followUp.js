@@ -1,7 +1,7 @@
 const { askClaude } = require('../integrations/anthropic');
 const ghl = require('../integrations/ghl');
 const { brainToSystemPrompt } = require('../config/loadBrain');
-const { checkSmsCompliance, ensureMedicareDisclaimer, ensureCanSpamFooter } = require('../config/complianceGuard');
+const { checkSmsCompliance, ensureMedicareDisclaimer, checkMedicareQuoteLink, ensureCanSpamFooter } = require('../config/complianceGuard');
 const db = require('../store/db');
 
 const ROLE_PROMPT = `
@@ -64,6 +64,11 @@ async function draftFollowUp({ brain, lead, attemptNumber, channel = 'SMS', cont
   if (medicare.needsArea) {
     parsed.shouldSend = false;
     parsed.reason = medicare.reason;
+  }
+  const qlink = checkMedicareQuoteLink(parsed.message, { brain, leadText: context });
+  if (qlink.hold) {
+    parsed.shouldSend = false;
+    parsed.reason = qlink.reason;
   }
 
   // CAN-SPAM requires a physical mailing address on commercial email -

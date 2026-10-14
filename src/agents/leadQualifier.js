@@ -1,7 +1,7 @@
 const { askClaude } = require('../integrations/anthropic');
 const ghl = require('../integrations/ghl');
 const { brainToSystemPrompt } = require('../config/loadBrain');
-const { ensureMedicareDisclaimer, detectInvestmentTopic, financialGuardsOn, detectDonorHandoff } = require('../config/complianceGuard');
+const { ensureMedicareDisclaimer, checkMedicareQuoteLink, detectInvestmentTopic, financialGuardsOn, detectDonorHandoff } = require('../config/complianceGuard');
 const db = require('../store/db');
 
 const ROLE_PROMPT = `
@@ -122,6 +122,15 @@ async function qualifyLead({ brain, lead }) {
       };
     } else {
       parsed.reply = medicare.messageText;
+    }
+  }
+
+  // Medicare quoting link: only to leads who asked about Medicare, exact
+  // link, no carrier names, and only once it's approved (enforced in code).
+  if (parsed.reply) {
+    const qlink = checkMedicareQuoteLink(parsed.reply, { brain, leadText: `${lead.message || ''} ${lead.context || ''}` });
+    if (qlink.hold) {
+      parsed = { ...parsed, verdict: 'needs_human', reason: `${qlink.reason} (Agent's read: ${parsed.reason || 'n/a'})`, reply: '', draftForDrGrove: parsed.reply };
     }
   }
 

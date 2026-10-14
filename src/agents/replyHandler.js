@@ -1,6 +1,6 @@
 const { askClaude } = require('../integrations/anthropic');
 const { brainToSystemPrompt } = require('../config/loadBrain');
-const { ensureMedicareDisclaimer, detectInvestmentTopic, financialGuardsOn, detectDonorHandoff } = require('../config/complianceGuard');
+const { ensureMedicareDisclaimer, checkMedicareQuoteLink, detectInvestmentTopic, financialGuardsOn, detectDonorHandoff } = require('../config/complianceGuard');
 const db = require('../store/db');
 
 /**
@@ -129,6 +129,15 @@ async function handleReply({ brain, lead, replyText, channel, context }) {
       };
     } else {
       parsed.reply = medicare.messageText;
+    }
+  }
+
+  // Medicare quoting link guard (their reply, or our last message to them,
+  // has to show the Medicare interest).
+  if (parsed.reply) {
+    const qlink = checkMedicareQuoteLink(parsed.reply, { brain, leadText: `${text} ${context || ''}` });
+    if (qlink.hold) {
+      parsed = { intent: 'needs_human', reason: `${qlink.reason} (Agent's read: ${parsed.reason || 'n/a'})`, reply: '', draftForDrGrove: parsed.reply };
     }
   }
 

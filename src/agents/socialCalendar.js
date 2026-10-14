@@ -1,6 +1,6 @@
 const { askClaude } = require('../integrations/anthropic');
 const { brainToSystemPrompt } = require('../config/loadBrain');
-const { detectInvestmentTopic, financialGuardsOn, checkSeparation, ensureMedicareDisclaimer } = require('../config/complianceGuard');
+const { detectInvestmentTopic, financialGuardsOn, checkSeparation, ensureMedicareDisclaimer, checkMedicareQuoteLink } = require('../config/complianceGuard');
 const { findUnapprovedFigures } = require('./contentAgent');
 const db = require('../store/db');
 
@@ -115,6 +115,8 @@ async function buildSocialCalendar({ brain, instruction }) {
     const figures = findUnapprovedFigures([content], brain);
     if (figures.length) flags.push(`Check these figures before posting: ${figures.join(', ')}.`);
     if (/\[[^\]]*\]/.test(content)) flags.push('Has a [placeholder] to fill in.');
+    const qlink = checkMedicareQuoteLink(content, { brain, leadText: null });
+    if (qlink.hold) flags.push(qlink.reason);
     content = ensureMedicareDisclaimer(content, { brain }).messageText;
     return {
       date: d.date,

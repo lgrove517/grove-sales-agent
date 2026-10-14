@@ -1,7 +1,7 @@
 const { askClaude } = require('../integrations/anthropic');
 const ghl = require('../integrations/ghl');
 const { brainToSystemPrompt } = require('../config/loadBrain');
-const { checkSmsCompliance, ensureMedicareDisclaimer } = require('../config/complianceGuard');
+const { checkSmsCompliance, ensureMedicareDisclaimer, checkMedicareQuoteLink } = require('../config/complianceGuard');
 const db = require('../store/db');
 
 const ROLE_PROMPT = `
@@ -54,6 +54,11 @@ async function handleBookingIntent({ brain, lead, context }) {
   if (medicare.needsArea) {
     parsed.action = 'escalate';
     parsed.reason = medicare.reason;
+  }
+  const qlink = checkMedicareQuoteLink(parsed.message, { brain, leadText: context });
+  if (qlink.hold) {
+    parsed.action = 'escalate';
+    parsed.reason = qlink.reason;
   }
 
   const compliance = checkSmsCompliance('SMS', parsed.message, brain);
