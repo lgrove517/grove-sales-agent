@@ -167,12 +167,17 @@ function medicareAreaFor(brain, lead) {
  *    appended and needsArea: true - callers hold that draft for Dr. Grove,
  *    because the counts can't be stated correctly for that person;
  *  - no lead at all (social posts) gets the brain's generalText.
+ *  - anyMedicareMention: true (social posts) treats any mention of the word
+ *    Medicare as discussing plans.
  */
-function ensureMedicareDisclaimer(messageText, { brain, lead } = {}) {
+function ensureMedicareDisclaimer(messageText, { brain, lead, anyMedicareMention = false } = {}) {
   const text = messageText || '';
   const lower = text.toLowerCase();
   const mentionsMedicarePlan =
-    MEDICARE_PLAN_KEYWORDS.some((kw) => lower.includes(kw)) || QUOTE_SITE_PATTERN.test(text);
+    MEDICARE_PLAN_KEYWORDS.some((kw) => lower.includes(kw)) || QUOTE_SITE_PATTERN.test(text) ||
+    // Social posts are mass marketing to Medicare beneficiaries, so any
+    // mention of Medicare gets the disclaimer there (Oct 14 2026).
+    (anyMedicareMention && /\bmedicare\b/i.test(text));
   const alreadyDisclosed = lower.includes('we do not offer every plan available in your area');
 
   if (!mentionsMedicarePlan || alreadyDisclosed) {
