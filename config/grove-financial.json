@@ -110,6 +110,75 @@
       }
     ]
   },
+  "medicareQuoting": {
+    "_comment": "Oct 13 2026, Dr. Grove: 2027 consumer quoting and enrollment site from SMA (DestinationRx hub). Stays OFF until MEDICARE_QUOTING_APPROVED=true is set on the host, so it sits in the code while compliance reviews it. The site only shows the SMA-contracted plans below; Wellcare, Devoted and Aetna Medicare Advantage plans are sold through a different FMO and are NOT on the site, and are on his PlanEnroll page instead (added Oct 13 2026). Neither link shows everything he offers, so a message must never imply it does. Change the site's default password before turning this on. Re-check the carrier list every plan year.",
+    "approvalFlag": "MEDICARE_QUOTING_APPROVED",
+    "planYear": 2027,
+    "quoteToolUrl": "https://my.destinationrx.com/hub/s/SB814T87A",
+    "quoteTools": [
+      {
+        "name": "SMA plan-comparison site (DestinationRx)",
+        "url": "https://my.destinationrx.com/hub/s/SB814T87A",
+        "primary": true,
+        "covers": "Humana and UnitedHealthcare Medicare Advantage/Part D; Medigap from AARP, Aetna, Humana, Mutual of Omaha, USFire; ancillary from Aetna, CIGNA, Humana",
+        "useWhen": "Default link for any Medicare lead, and the one to use for Medicare Supplement interest."
+      },
+      {
+        "name": "PlanEnroll (Integrity, other FMO)",
+        "url": "https://planenroll.com/?purl=Leon-Grove",
+        "primary": false,
+        "covers": "Wellcare, Devoted and Aetna Medicare Advantage plans Dr. Grove sells through his other FMO (Oct 13 2026)",
+        "useWhen": "Second option only: when the lead says the first site didn't show their current plan, doctor or medication, or Leon Grove's notes ask for it. Never send both links in one message."
+      }
+    ],
+    "quoteToolCovers": {
+      "medicareAdvantageAndPartD": [
+        "Humana",
+        "UnitedHealthcare"
+      ],
+      "medicareSupplement": [
+        "AARP",
+        "Aetna",
+        "Humana",
+        "Mutual of Omaha",
+        "USFire"
+      ],
+      "ancillary": [
+        "Aetna",
+        "CIGNA",
+        "Humana"
+      ],
+      "states": [
+        "AL",
+        "AZ",
+        "FL",
+        "SC",
+        "NC (Humana only)"
+      ]
+    },
+    "otherCarriersByConversation": {
+      "via": "a different FMO",
+      "medicareAdvantage": [
+        "Wellcare",
+        "Devoted",
+        "Aetna"
+      ]
+    },
+    "ctaLines": [
+      "You can compare the 2027 Medicare plans I represent in your area here, on your own time:",
+      "Want to look before we talk? Here's where you can compare 2027 plans in your area:",
+      "Plans change every year. You can see what's available for 2027 in your area here:"
+    ],
+    "rules": [
+      "Only share the link with someone who asked about Medicare, has a Medicare tag, or said they are turning 65 or new to Medicare. Never cold-send it.",
+      "Always offer the booking link alongside it, so they can review plans with Leon Grove instead of shopping alone.",
+      "The site shows some, not all, of the plans Leon Grove offers. Never say or imply it shows every plan or all of his plans. If it fits, say other plans can be reviewed together on a call.",
+      "Never name a carrier (Humana, UnitedHealthcare, AARP, Aetna, CIGNA, Mutual of Omaha, USFire, Wellcare, Devoted) in a lead-facing message - carrier names need carrier approval.",
+      "Never call the plans or the tool free, best, cheapest or lowest-cost, and never promise savings.",
+      "Use the link at most once in a follow-up sequence (attempt 1 or 2), not in every message.",
+      "Copy the link exactly as written, and send only one quoting link per message. The code adds the required CMS disclaimer whenever the link appears."
+    ]
+  },
   "marketingApproach": "Sep 17 2026 direction from Dr. Grove, confirmed with Gradient Advisors: market from Grove Financial Group (the insurance entity) and lead with State Insurance law compliance, not the Investment Advisor Representative disclosure. The goal of any first-touch or marketing message is simply to get a prospect talking with Dr. Grove through Grove Financial Group - not to pitch a specific product line up front. Which specific offer fits (insurance, Medicare, CD alternative, business planning, or investment advisory) is discovered in that conversation, not decided by the agent beforehand. Practical effect: the leadQualifier and contentDrafter agents should keep first-touch messages general ('let's talk about your financial picture' / 'happy to see how Grove Financial Group can help'), not lead with 'Retirement Plan Review' or 'Investment Advisory' by name, unless the lead themselves already named that specific interest. Oct 2026 update from Dr. Grove: retirement messaging on the Grove Financial Group side leads with income questions, not investment products - see messagingThemes. 401(k)s, rollovers, pensions, IRAs, business retirement plans and fiduciary services belong to Grove Wealth Management (Gradient Advisors); a Grove Financial Group message never raises them. When a lead raises them, the agent does not answer - it routes the lead to Dr. Grove (enforced in code: complianceGuard.detectInvestmentTopic).",
   "voice": {
     "tone": "Warm, credible, unhurried. Leads with expertise (ChFC, RICP, 29 years experience, Marine Corps veteran) without being salesy. Speaks to Gulf Coast individuals and business owners like a trusted advisor, not a call-center script. First-touch messages open a conversation about their financial picture broadly - they do not pitch a specific product (see marketingApproach).",
@@ -163,7 +232,7 @@
     },
     {
       "name": "Medicare Planning",
-      "description": "Help understanding Medicare options and timing.",
+      "description": "Help understanding Medicare options and timing (turning 65, Annual Enrollment Oct 15-Dec 7, Medicare Advantage Open Enrollment Jan 1-Mar 31, Medicare Supplement any time). When the Medicare quoting tool is on (see MEDICARE QUOTE TOOLS), a lead who asked about Medicare can be given the plan-comparison link as well as the booking link.",
       "cta": "Schedule a consultation"
     },
     {
