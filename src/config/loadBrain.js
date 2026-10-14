@@ -74,9 +74,41 @@ function applyApprovalGates(brain) {
     brain.messagingThemes = { approvalFlag: themes.approvalFlag };
   }
 
+  // Medicare online quoting link: same on/off switch. While it's off the
+  // agents never see the link or its rules, and complianceGuard holds any
+  // draft that carries the URL anyway (brain.medicareQuotingOff remembers it).
+  const mq = brain.medicareQuoting;
+  if (mq && mq.approvalFlag) {
+    const on = isApproved(mq.approvalFlag);
+    workflows.push({ name: 'Medicare online plan-comparison link', flag: mq.approvalFlag, enabled: on });
+    if (!on) {
+      pending.push('Medicare online plan-comparison link (do not share any quoting or enrollment website)');
+      brain.medicareQuotingOff = { quoteToolUrl: mq.quoteToolUrl };
+      delete brain.medicareQuoting;
+    }
+  }
+
   brain.pendingWorkflows = pending;
   brain.workflowStatus = workflows;
   return brain;
+}
+
+/** Prompt block for the Medicare plan-comparison link, or '' when it's off. */
+function medicareQuotingPrompt(mq) {
+  if (!mq || !mq.quoteToolUrl) return '';
+  return [
+    ``,
+    `MEDICARE QUOTE TOOLS (plan year ${mq.planYear || ''}): online sites where a Medicare lead can compare plans and enroll on their own.`,
+    ...(mq.quoteTools && mq.quoteTools.length
+      ? mq.quoteTools.map((t) => `- ${t.primary ? 'PRIMARY' : 'SECOND OPTION'}: ${t.url} - ${t.useWhen} (Internal note, never for the lead: covers ${t.covers}.)`)
+      : [`- ${mq.quoteToolUrl}`]),
+    `When a lead has asked about Medicare (or is turning 65 / new to Medicare), you may give ONE of these links with ONE of these lead-in lines, then the booking link as the other option:`,
+    ...(mq.ctaLines || []).map((l) => `- "${l}"`),
+    `Rules for the link:`,
+    ...(mq.rules || []).map((r) => `- ${r}`),
+    `Social posts and content may also invite people to compare ${mq.planYear || ''} plans with the PRIMARY link, especially during Annual Enrollment (Oct 15-Dec 7).`,
+    ``,
+  ].join('\n');
 }
 
 function clearBrainCache() {
@@ -114,6 +146,7 @@ function brainToSystemPrompt(brain) {
     brain.messagingThemes?.retirementIncome?.length
       ? `RETIREMENT MESSAGING - open retirement conversations with these questions (${brain.messagingThemes.notes || ''}): ${brain.messagingThemes.retirementIncome.map((q) => `"${q}"`).join(' / ')}`
       : '',
+    medicareQuotingPrompt(brain.medicareQuoting),
     brain.pendingWorkflows?.length
       ? `PENDING COMPLIANCE APPROVAL - these workflows are switched OFF. Do not offer, describe, or write messaging for them, and do not invent a substitute: ${brain.pendingWorkflows.join('; ')}. If a lead raises one of these topics, use the General Conversation offer (an invitation to talk with Dr. Grove) and nothing more.`
       : '',

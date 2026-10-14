@@ -126,7 +126,15 @@ const MEDICARE_PLAN_KEYWORDS = [
   'part d plan',
   'medicare supplement',
   'medigap',
+  'medicare plan',
 ];
+
+// Any consumer quoting/enrollment site link counts as discussing plans.
+const QUOTE_SITE_PATTERN = /destinationrx\.com|planenroll\.com/i;
+const QUOTE_LINK_PATTERN = /(?:https?:\/\/)?(?:[\w-]+\.)*(?:destinationrx|planenroll)\.com\S*/gi;
+
+// Signs the LEAD (not the draft) has shown Medicare interest.
+const MEDICARE_INTEREST_PATTERN = /\b(medicare|medigap|part d|turning 65|turn(?:s|ed)? 65|annual enrollment)\b/i;
 
 // Fallback only, for a brain with no medicareDisclaimer config. CMS now
 // expects the version with exact organization/product counts, which a brain
@@ -163,7 +171,8 @@ function medicareAreaFor(brain, lead) {
 function ensureMedicareDisclaimer(messageText, { brain, lead } = {}) {
   const text = messageText || '';
   const lower = text.toLowerCase();
-  const mentionsMedicarePlan = MEDICARE_PLAN_KEYWORDS.some((kw) => lower.includes(kw));
+  const mentionsMedicarePlan =
+    MEDICARE_PLAN_KEYWORDS.some((kw) => lower.includes(kw)) || QUOTE_SITE_PATTERN.test(text);
   const alreadyDisclosed = lower.includes('we do not offer every plan available in your area');
 
   if (!mentionsMedicarePlan || alreadyDisclosed) {
@@ -196,6 +205,67 @@ function ensureMedicareDisclaimer(messageText, { brain, lead } = {}) {
     messageText: `${text}\n\n${disclaimer}`,
     disclaimerAppended: true,
   };
+}
+
+/**
+ * Medicare quoting-link guard (Oct 2026). The model is told the rules in the
+ * prompt; this makes the important ones hold even if it forgets. Returns
+ * { hold: false } or { hold: true, reason } - callers hold the draft for
+ * Dr. Grove, the same as a missing-county disclaimer.
+ *
+ * Holds a draft that carries a quoting-site link when:
+ *  - the quoting link is switched off (MEDICARE_QUOTING_APPROVED not true);
+ *  - the link isn't the exact one on file (altered or a different site);
+ *  - the lead never showed Medicare interest (leadText is what they said
+ *    plus their GHL tags) - the link is never cold-sent;
+ *  - the draft names a carrier (carrier names need carrier approval).
+ * Social posts pass leadText: null to skip the interest check.
+ */
+function checkMedicareQuoteLink(messageText, { brain, leadText } = {}) {
+  const text = messageText || '';
+  if (!QUOTE_SITE_PATTERN.test(text)) return { hold: false };
+
+  const mq = brain?.medicareQuoting;
+  if (!mq) {
+    return {
+      hold: true,
+      reason: 'Draft includes a Medicare quoting-site link, but the quoting link is still switched off pending compliance (MEDICARE_QUOTING_APPROVED). Held for Dr. Grove.',
+    };
+  }
+
+  const allowed = (mq.quoteTools || []).map((t) => t.url).concat(mq.quoteToolUrl || []);
+  const links = text.match(QUOTE_LINK_PATTERN) || [];
+  const clean = (u) => u.replace(/[).,;:!?'"]+$/, '');
+  if (!links.length || links.some((u) => !allowed.includes(clean(u)))) {
+    return {
+      hold: true,
+      reason: `Draft's quoting link doesn't match one on file (${allowed.join(' or ')}). Held for Dr. Grove.`,
+    };
+  }
+  if (new Set(links.map(clean)).size > 1) {
+    return { hold: true, reason: 'Draft gives two different Medicare quoting links - send one at a time. Held for Dr. Grove.' };
+  }
+
+  if (leadText !== null && !MEDICARE_INTEREST_PATTERN.test(leadText || '')) {
+    return {
+      hold: true,
+      reason: "Draft includes the Medicare quoting link, but this lead hasn't asked about Medicare and has no Medicare tag - the link is never cold-sent. Held for Dr. Grove.",
+    };
+  }
+
+  const carriers = [
+    ...Object.values(mq.quoteToolCovers || {}).flat(),
+    ...Object.values(mq.otherCarriersByConversation || {}).flat(),
+  ].filter((c) => typeof c === 'string' && /^[A-Z]/.test(c) && !/^[A-Z]{2}\b/.test(c) && !/FMO/.test(c));
+  const named = [...new Set(carriers)].find((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text));
+  if (named) {
+    return {
+      hold: true,
+      reason: `Draft with the Medicare quoting link names ${named} - carrier names need carrier approval. Held for Dr. Grove.`,
+    };
+  }
+
+  return { hold: false };
 }
 
 /**
@@ -291,6 +361,8 @@ module.exports = {
   detectInvestmentTopic,
   INVESTMENT_TOPIC_PATTERNS,
   ensureMedicareDisclaimer,
+  checkMedicareQuoteLink,
+  MEDICARE_INTEREST_PATTERN,
   medicareAreaFor,
   leadZip,
   TPMO_DISCLAIMER,
