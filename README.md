@@ -214,6 +214,7 @@ on `/health`, and auto-restart if the app crashes. In the Railway dashboard:
    - `GHL_SEND_MODE=review` (drafts only) until you are ready to go live
    - `AUTO_FOLLOWUP=false` until you are ready for the 24/7 scheduler
    - `RETIREMENT_WORKFLOW_APPROVED=false` until Gradient approves it
+   - `MEDICARE_QUOTING_APPROVED=false` until compliance clears the Medicare quoting link
    - Do NOT set `PORT` - Railway supplies it.
 4. **Check it:** open `https://<your-railway-url>/health`. You should see
    `"ok": true`, both integrations configured, and the list of
@@ -247,6 +248,14 @@ after Gradient approves it: Railway > Variables >
 `RETIREMENT_WORKFLOW_APPROVED=true`. Railway restarts the service and it is
 live; no code change needed. Use the same pattern for the Medicare, LTC, CD
 and IUL workflows when they are added.
+
+**Medicare quoting link** (`medicareQuoting` in `grove-financial.json`,
+flag `MEDICARE_QUOTING_APPROVED`). When on, agents may give Medicare leads
+one of the 2027 plan-comparison sites (SMA primary, PlanEnroll second) alongside the booking link. Code holds any
+draft with the link that goes to a lead with no Medicare interest (their
+message or a Medicare tag), uses a link not on file or both links at once, or names a carrier, and
+the county disclaimer is always appended. Check with
+`node test/medicareQuoting.test.js`.
 
 ## Turning this into a sellable Webtech Design product
 
