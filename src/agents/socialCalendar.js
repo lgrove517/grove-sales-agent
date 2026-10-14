@@ -117,7 +117,7 @@ async function buildSocialCalendar({ brain, instruction }) {
     if (/\[[^\]]*\]/.test(content)) flags.push('Has a [placeholder] to fill in.');
     const qlink = checkMedicareQuoteLink(content, { brain, leadText: null });
     if (qlink.hold) flags.push(qlink.reason);
-    content = ensureMedicareDisclaimer(content, { brain }).messageText;
+    content = ensureMedicareDisclaimer(content, { brain, anyMedicareMention: true }).messageText;
     return {
       date: d.date,
       weekday: d.weekday,
