@@ -3,9 +3,10 @@
  * package. One line per level:
  *   Starter - no AI. The client runs on the GoHighLevel system only.
  *   Growth  - the AI writes their marketing (content, social calendar,
- *             briefing, recommendations, monthly report).
- *   Premium - the AI also works their leads (qualifies, replies, books,
- *             follows up), with review mode until the client approves.
+ *             briefing, recommendations, monthly report) and sends
+ *             follow-ups to leads who have gone quiet.
+ *   Premium - the AI also works their leads (qualifies, replies, books),
+ *             with review mode until the client approves.
  *
  * Where a client's package comes from, first match wins:
  *   1. The package saved in the database - set automatically by Stripe when
@@ -35,11 +36,11 @@ const FEATURES = {
   recommendations: { needs: 'growth', label: 'Recommendations for more leads' },
   monthlyReport: { needs: 'growth', label: 'Monthly results report' },
   statusSync: { needs: 'growth', label: 'Booked / opted-out status sync' },
+  aiFollowUp: { needs: 'growth', label: 'AI follow-ups' },
   // AI works your leads (Premium)
   leadAgent: { needs: 'premium', label: 'Lead qualifier and first reply' },
   replyAgent: { needs: 'premium', label: 'Reply handler' },
   appointmentSetter: { needs: 'premium', label: 'Appointment setter' },
-  aiFollowUp: { needs: 'premium', label: 'AI follow-ups' },
 };
 
 db.db.exec(`
