@@ -164,6 +164,12 @@
         "Aetna"
       ]
     },
+    "soaSurvey": {
+      "_comment": "Oct 14 2026, Dr. Grove: compliance-approved RetireFlo survey. It serves as the Scope of Appointment and collects doctors, pharmacy and prescriptions with no personal identifiers. Since the CY2027 rule there is no 48-hour wait; the SOA only has to be completed before the meeting starts.",
+      "url": "https://retireflo.com/leon-grove-chfc-ricp",
+      "ctaLine": "Before we meet, this short survey lets me prepare options around your doctors, pharmacy and prescriptions:",
+      "useWhen": "Send it when a Medicare lead agrees to meet or books a time, together with the booking link or the confirmed time. One time per conversation. It can go in the same message as one quoting link."
+    },
     "ctaLines": [
       "You can compare the 2027 Medicare plans I represent in your area here, on your own time:",
       "Want to look before we talk? Here's where you can compare 2027 plans in your area:",
