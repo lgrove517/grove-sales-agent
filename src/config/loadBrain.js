@@ -107,6 +107,9 @@ function medicareQuotingPrompt(mq) {
     `Rules for the link:`,
     ...(mq.rules || []).map((r) => `- ${r}`),
     `Social posts and content may also invite people to compare ${mq.planYear || ''} plans with the PRIMARY link, especially during Annual Enrollment (Oct 15-Dec 7).`,
+    mq.soaSurvey && mq.soaSurvey.url
+      ? `SCOPE OF APPOINTMENT SURVEY: ${mq.soaSurvey.url} - ${mq.soaSurvey.useWhen} Lead-in line: "${mq.soaSurvey.ctaLine}" Copy the link exactly. Never put it in a social post.`
+      : '',
     ``,
   ].join('\n');
 }

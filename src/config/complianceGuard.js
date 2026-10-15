@@ -130,8 +130,11 @@ const MEDICARE_PLAN_KEYWORDS = [
 ];
 
 // Any consumer quoting/enrollment site link counts as discussing plans.
-const QUOTE_SITE_PATTERN = /destinationrx\.com|planenroll\.com/i;
+const QUOTE_SITE_PATTERN = /destinationrx\.com|planenroll\.com|retireflo\.com/i;
 const QUOTE_LINK_PATTERN = /(?:https?:\/\/)?(?:[\w-]+\.)*(?:destinationrx|planenroll)\.com\S*/gi;
+// The Scope of Appointment survey (RetireFlo): checked like the quoting links,
+// but may ride alongside one of them.
+const SOA_LINK_PATTERN = /(?:https?:\/\/)?(?:[\w-]+\.)*retireflo\.com\S*/gi;
 
 // Signs the LEAD (not the draft) has shown Medicare interest.
 const MEDICARE_INTEREST_PATTERN = /\b(medicare|medigap|part d|turning 65|turn(?:s|ed)? 65|annual enrollment)\b/i;
@@ -224,6 +227,8 @@ function ensureMedicareDisclaimer(messageText, { brain, lead, anyMedicareMention
  *  - the lead never showed Medicare interest (leadText is what they said
  *    plus their GHL tags) - the link is never cold-sent;
  *  - the draft names a carrier (carrier names need carrier approval).
+ * The RetireFlo Scope of Appointment survey link gets the same checks and
+ * must match brain.medicareQuoting.soaSurvey.url exactly.
  * Social posts pass leadText: null to skip the interest check.
  */
 function checkMedicareQuoteLink(messageText, { brain, leadText } = {}) {
@@ -238,10 +243,23 @@ function checkMedicareQuoteLink(messageText, { brain, leadText } = {}) {
     };
   }
 
+  const clean = (u) => u.replace(/[).,;:!?'"]+$/, '');
+  const soaLinks = text.match(SOA_LINK_PATTERN) || [];
+  const soaUrl = mq.soaSurvey && mq.soaSurvey.url;
+  if (soaLinks.some((u) => clean(u) !== soaUrl)) {
+    return {
+      hold: true,
+      reason: `Draft's survey link doesn't match the Scope of Appointment survey on file (${soaUrl || 'none on file'}). Held for Dr. Grove.`,
+    };
+  }
+
+  if (soaLinks.length && leadText === null) {
+    return { hold: true, reason: 'The Scope of Appointment survey link is for one-to-one messages, not social posts.' };
+  }
+
   const allowed = (mq.quoteTools || []).map((t) => t.url).concat(mq.quoteToolUrl || []);
   const links = text.match(QUOTE_LINK_PATTERN) || [];
-  const clean = (u) => u.replace(/[).,;:!?'"]+$/, '');
-  if (!links.length || links.some((u) => !allowed.includes(clean(u)))) {
+  if (links.some((u) => !allowed.includes(clean(u)))) {
     return {
       hold: true,
       reason: `Draft's quoting link doesn't match one on file (${allowed.join(' or ')}). Held for Dr. Grove.`,
@@ -254,7 +272,7 @@ function checkMedicareQuoteLink(messageText, { brain, leadText } = {}) {
   if (leadText !== null && !MEDICARE_INTEREST_PATTERN.test(leadText || '')) {
     return {
       hold: true,
-      reason: "Draft includes the Medicare quoting link, but this lead hasn't asked about Medicare and has no Medicare tag - the link is never cold-sent. Held for Dr. Grove.",
+      reason: "Draft includes a Medicare link, but this lead hasn't asked about Medicare and has no Medicare tag - Medicare links are never cold-sent. Held for Dr. Grove.",
     };
   }
 
@@ -266,7 +284,7 @@ function checkMedicareQuoteLink(messageText, { brain, leadText } = {}) {
   if (named) {
     return {
       hold: true,
-      reason: `Draft with the Medicare quoting link names ${named} - carrier names need carrier approval. Held for Dr. Grove.`,
+      reason: `Draft with a Medicare link names ${named} - carrier names need carrier approval. Held for Dr. Grove.`,
     };
   }
 
