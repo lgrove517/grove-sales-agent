@@ -228,7 +228,8 @@ function ensureMedicareDisclaimer(messageText, { brain, lead, anyMedicareMention
  *    plus their GHL tags) - the link is never cold-sent;
  *  - the draft names a carrier (carrier names need carrier approval).
  * The RetireFlo Scope of Appointment survey link gets the same checks and
- * must match brain.medicareQuoting.soaSurvey.url exactly.
+ * must match brain.medicareQuoting.soaSurvey.url exactly. It works even while
+ * the quoting links are switched off (medicareQuoting.quotingOff).
  * Social posts pass leadText: null to skip the interest check.
  */
 function checkMedicareQuoteLink(messageText, { brain, leadText } = {}) {
@@ -236,7 +237,8 @@ function checkMedicareQuoteLink(messageText, { brain, leadText } = {}) {
   if (!QUOTE_SITE_PATTERN.test(text)) return { hold: false };
 
   const mq = brain?.medicareQuoting;
-  if (!mq) {
+  const hasQuoteSite = /destinationrx\.com|planenroll\.com/i.test(text);
+  if (!mq || (mq.quotingOff && hasQuoteSite)) {
     return {
       hold: true,
       reason: 'Draft includes a Medicare quoting-site link, but the quoting link is still switched off pending compliance (MEDICARE_QUOTING_APPROVED). Held for Dr. Grove.',

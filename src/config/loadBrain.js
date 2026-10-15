@@ -74,17 +74,23 @@ function applyApprovalGates(brain) {
     brain.messagingThemes = { approvalFlag: themes.approvalFlag };
   }
 
-  // Medicare online quoting link: same on/off switch. While it's off the
-  // agents never see the link or its rules, and complianceGuard holds any
-  // draft that carries the URL anyway (brain.medicareQuotingOff remembers it).
+  // Medicare online quoting links: same on/off switch. While it's off the
+  // agents never see those links or their rules, and complianceGuard holds
+  // any draft that carries one anyway. The RetireFlo Scope of Appointment
+  // survey is not behind this switch (already approved for use, Oct 15 2026,
+  // Dr. Grove): it stays available, with the carrier list its checks need.
   const mq = brain.medicareQuoting;
   if (mq && mq.approvalFlag) {
     const on = isApproved(mq.approvalFlag);
     workflows.push({ name: 'Medicare online plan-comparison link', flag: mq.approvalFlag, enabled: on });
     if (!on) {
-      pending.push('Medicare online plan-comparison link (do not share any quoting or enrollment website)');
-      brain.medicareQuotingOff = { quoteToolUrl: mq.quoteToolUrl };
-      delete brain.medicareQuoting;
+      pending.push('Medicare online plan-comparison links (do not share any plan-comparison or enrollment website; the Scope of Appointment survey is fine)');
+      brain.medicareQuoting = {
+        quotingOff: true,
+        quoteToolCovers: mq.quoteToolCovers,
+        otherCarriersByConversation: mq.otherCarriersByConversation,
+        soaSurvey: mq.soaSurvey,
+      };
     }
   }
 
@@ -95,7 +101,11 @@ function applyApprovalGates(brain) {
 
 /** Prompt block for the Medicare plan-comparison link, or '' when it's off. */
 function medicareQuotingPrompt(mq) {
-  if (!mq || !mq.quoteToolUrl) return '';
+  if (!mq) return '';
+  const soaLine = mq.soaSurvey && mq.soaSurvey.url
+    ? `SCOPE OF APPOINTMENT SURVEY: ${mq.soaSurvey.url} - ${mq.soaSurvey.useWhen} Lead-in line: "${mq.soaSurvey.ctaLine}" Copy the link exactly. Only for leads who asked about Medicare. Never put it in a social post, and never name a carrier with it.`
+    : '';
+  if (mq.quotingOff || !mq.quoteToolUrl) return soaLine ? `\n${soaLine}\n` : '';
   return [
     ``,
     `MEDICARE QUOTE TOOLS (plan year ${mq.planYear || ''}): online sites where a Medicare lead can compare plans and enroll on their own.`,
@@ -107,9 +117,7 @@ function medicareQuotingPrompt(mq) {
     `Rules for the link:`,
     ...(mq.rules || []).map((r) => `- ${r}`),
     `Social posts and content may also invite people to compare ${mq.planYear || ''} plans with the PRIMARY link, especially during Annual Enrollment (Oct 15-Dec 7).`,
-    mq.soaSurvey && mq.soaSurvey.url
-      ? `SCOPE OF APPOINTMENT SURVEY: ${mq.soaSurvey.url} - ${mq.soaSurvey.useWhen} Lead-in line: "${mq.soaSurvey.ctaLine}" Copy the link exactly. Never put it in a social post.`
-      : '',
+    soaLine,
     ``,
   ].join('\n');
 }
