@@ -53,6 +53,22 @@ test('on: two links in one message is held', () => assert(checkMedicareQuoteLink
 test('PlanEnroll link triggers disclaimer', () => assert(ensureMedicareDisclaimer(peDraft, { brain: on, lead: mobileLead }).disclaimerAppended));
 test('off: PlanEnroll link is held', () => assert(checkMedicareQuoteLink(peDraft, { brain: brainWith(false), leadText: 'medicare' }).hold));
 
+// RetireFlo Scope of Appointment survey
+const SOA = 'https://retireflo.com/leon-grove-chfc-ricp';
+const soaDraft = `Before we meet, this short survey lets me prepare options around your doctors, pharmacy and prescriptions: ${SOA}`;
+test('on: survey link in prompt', () => assert(brainToSystemPrompt(on).includes(SOA)));
+test('off: survey link still in prompt', () => assert(brainToSystemPrompt(off).includes(SOA)));
+test('on: survey link to Medicare lead passes', () => assert(!checkMedicareQuoteLink(soaDraft, { brain: on, leadText: 'medicare' }).hold));
+test('on: survey + one quote link passes', () => assert(!checkMedicareQuoteLink(`${draft} ${soaDraft}`, { brain: on, leadText: 'medicare' }).hold));
+test('on: altered survey link is held', () => assert(checkMedicareQuoteLink(soaDraft.replace('leon-grove', 'someone'), { brain: on, leadText: 'medicare' }).hold));
+test('on: survey to non-Medicare lead is held', () => assert(checkMedicareQuoteLink(soaDraft, { brain: on, leadText: 'life insurance' }).hold));
+test('on: survey in a social post is held', () => assert(checkMedicareQuoteLink(soaDraft, { brain: on, leadText: null }).hold));
+test('off: survey link to Medicare lead passes', () => assert(!checkMedicareQuoteLink(soaDraft, { brain: off, leadText: 'medicare' }).hold));
+test('off: survey still held for non-Medicare lead', () => assert(checkMedicareQuoteLink(soaDraft, { brain: off, leadText: 'life insurance' }).hold));
+test('off: survey + quote link is held', () => assert(checkMedicareQuoteLink(`${draft} ${soaDraft}`, { brain: off, leadText: 'medicare' }).hold));
+test('off: survey naming a carrier is held', () => assert(checkMedicareQuoteLink(`${soaDraft} Humana`, { brain: off, leadText: 'medicare' }).hold));
+test('survey link triggers disclaimer', () => assert(ensureMedicareDisclaimer(soaDraft, { brain: on, lead: mobileLead }).disclaimerAppended));
+
 // Disclaimer always rides along with the link
 test('link alone triggers county disclaimer', () => {
   const r = ensureMedicareDisclaimer(`Compare plans here: ${URL}`, { brain: on, lead: mobileLead });
