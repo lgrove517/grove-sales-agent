@@ -237,7 +237,12 @@ anything without one uses `DEFAULT_BRAIN`.
 - **Financial guards.** The Gradient / Grove Wealth Management investment
   guards are on for every client unless its file says
   `"compliance": { "financialAdvisoryGuards": false }` (Webtech does).
-- **Follow-up scheduler.** The 24/7 sweep runs for `DEFAULT_BRAIN` only.
+- **Follow-up scheduler.** The 24/7 sweep runs for `DEFAULT_BRAIN`, or for
+  every client listed in `SCHEDULER_BRAINS` (comma-separated, e.g.
+  `grove-financial,gfg-agency`).
+- **Shared GoHighLevel account.** Replies and status updates for a contact
+  the agent already worked use that contact's own client file, so Grove
+  Financial Group and its agency can share one "Customer Replied" workflow.
 
 ### Compliance on/off switches
 
