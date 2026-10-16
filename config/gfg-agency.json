@@ -6,9 +6,8 @@
   "website": "https://grovefinancialgroupinc.com/recruiting/",
   "partnersPage": "https://grovefinancialgroupinc.com/partners/",
   "phone": "(251) 206-7074",
-  "bookingLink": "",
+  "bookingLink": "https://api.leadconnectorhq.com/widget/bookings/grove-agency-calendar",
   "_todo": [
-    "bookingLink: paste the new agency calendar link here (Dr. Grove is creating it). Until then the agent says a link is coming and Dr. Grove sends it.",
     "partnersPage: confirm the URL once the Referral Partners page is published in WordPress."
   ],
   "mailingAddress": {
@@ -278,5 +277,6 @@
         }
       ]
     }
-  ]
+  ],
+  "bookingQr": "https://link.sendlink.co/qr/ck1N2YG-C1H-"
 }
