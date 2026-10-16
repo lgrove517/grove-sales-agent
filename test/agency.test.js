@@ -61,4 +61,19 @@ test('SOA survey link is held for the agency', () => assert(checkMedicareQuoteLi
 // Tags
 test('agency tags are its own', () => assert(agency.agentTags.securities === 'agency-securities-interest' && agency.agentTags.consumer === 'agency-route-to-gfg'));
 
+// Carrier contracting link (SureLC)
+const C = agency.contracting.url;
+const cDraft = `Here's the contracting link - it opens SureLC under the Grove Financial Group, Inc. branch: ${C}`;
+const q = (t, leadText) => checkMedicareQuoteLink(t, { brain: agency, leadText }).hold;
+test('contracting link in prompt', () => assert(brainToSystemPrompt(agency).includes(C)));
+test('licensed agent asking to contract gets the link', () => assert(!q(cDraft, "I'm licensed in Alabama, how do I get contracted?")));
+test('short link alias also passes', () => assert(!q('Start here: https://rb.gy/c4b0ew', 'Licensed P&C agent, what are the next steps to get appointed?')));
+test('unlicensed lead is held', () => assert(q(cDraft, 'I want to get contracted')));
+test('licensed but no contracting ask is held', () => assert(q(cDraft, 'Licensed agent interested in mentorship')));
+test('altered link is held', () => assert(q(cDraft.replace('gaId=14', 'gaId=99'), "I'm licensed, ready to get contracted")));
+test('other rb.gy link is held', () => assert(q('https://rb.gy/zzzzz', "I'm licensed, ready to get contracted")));
+test('contracting link in a social post is held', () => assert(q(cDraft, null)));
+test('follow-up with no lead words is held', () => assert(q(cDraft, 'Automatic scheduler sweep. Lead status: active.')));
+test('GFG brain unaffected by agency link rules', () => assert(!checkMedicareQuoteLink('Happy to talk Thursday.', { brain: gfg, leadText: '' }).hold));
+
 console.log(`\n${passed} checks passed`);
