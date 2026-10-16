@@ -7,6 +7,7 @@ const { buildBriefing, recommend } = require('./briefing');
 const { buildSocialCalendar } = require('./socialCalendar');
 const { buildMonthlyReport } = require('./monthlyReport');
 const { hasFeature, lockedMessage } = require('../config/packages');
+const { brainToSystemPrompt } = require('../config/loadBrain');
 const db = require('../store/db');
 
 // Which package feature each command needs (see src/config/packages.js).
@@ -42,11 +43,14 @@ one of these intents and extract any parameters mentioned:
   more booked appointments, or grow the pipeline
 - "monthly_report": they want the monthly results report / numbers for a
   month, e.g. "monthly report", "September results", "report for this month"
+- "ask": a question or comment for the assistant itself rather than a task,
+  e.g. "why isn't Arizona listed?", "which states am I licensed in?", "what
+  does the agent do when someone asks about a 401(k)?", "is this compliant?"
 - "unknown": doesn't clearly match any of the above
 
 Output STRICT JSON only:
 {
-  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "unknown",
+  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "ask" | "unknown",
   "leadName": "name mentioned, if any, else empty string",
   "cleanedInstruction": "the instruction, lightly cleaned up, to hand to the specialist agent"
 }
@@ -194,6 +198,14 @@ async function runCommand({ brain, instruction, since }) {
       response = await recommend({ brain, focus: routed.cleanedInstruction });
       break;
     }
+    case 'ask':
+    case 'unknown': {
+      // "Ask anything": a plain answer from the business's own rules. It
+      // never sends anything or changes a lead - it only answers the owner.
+      response = await answerQuestion({ brain, question: instruction });
+      if (response) break;
+    }
+    // falls through when no AI is configured
     default: {
       response = {
         message:
@@ -208,6 +220,27 @@ async function runCommand({ brain, instruction, since }) {
   const logged = response && response.csv ? { ...response, csv: undefined } : response;
   db.logCommand({ brand: brain.clientId, instruction, response: logged });
   return { intent: routed.intent, dryRun: routed.dryRun, response };
+}
+
+const ASK_PROMPT = `
+You are answering a question from the business owner in the command center
+(not from a lead). Answer plainly and briefly from the business rules above:
+licensed states, offers, compliance rules, what the agents will and won't do.
+If the answer depends on something not in the rules, say so. You cannot see
+earlier commands or drafts: if the question refers to one, say what you can
+and suggest they resend the full request (for example, the draft instruction
+with the states they want). Do not draft new marketing here unless asked.
+Plain text only, no JSON.
+`.trim();
+
+async function answerQuestion({ brain, question }) {
+  const result = await askClaude({
+    system: `${brainToSystemPrompt(brain)}\n\n${ASK_PROMPT}`,
+    messages: [{ role: 'user', content: question }],
+    maxTokens: 700,
+  });
+  if (result.dryRun || !result.text) return null;
+  return { message: String(result.text).trim() };
 }
 
 module.exports = { runCommand, classifyIntent };
