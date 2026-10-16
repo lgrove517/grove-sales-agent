@@ -162,6 +162,9 @@ function brainToSystemPrompt(brain) {
       ? `PENDING COMPLIANCE APPROVAL - these workflows are switched OFF. Do not offer, describe, or write messaging for them, and do not invent a substitute: ${brain.pendingWorkflows.join('; ')}. If a lead raises one of these topics, use the General Conversation offer (an invitation to talk with Dr. Grove) and nothing more.`
       : '',
     `VALUE PROPS: ${(brain.valueProps || []).join('; ')}`,
+    brain.contracting?.url
+      ? `CARRIER CONTRACTING LINK (${brain.contracting.platform}): ${brain.contracting.url} - ${brain.contracting.useWhen} Copy the link exactly.`
+      : '',
     brain.partnersPage ? `Referral partner page (for CPAs, accounting firms and attorneys): ${brain.partnersPage}` : '',
     brain.partnerContent
       ? [

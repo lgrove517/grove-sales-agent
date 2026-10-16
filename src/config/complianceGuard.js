@@ -240,8 +240,40 @@ function ensureMedicareDisclaimer(messageText, { brain, lead, anyMedicareMention
  * the quoting links are switched off (medicareQuoting.quotingOff).
  * Social posts pass leadText: null to skip the interest check.
  */
+/**
+ * Link rules (brain.linkRules), e.g. the agency's carrier-contracting link.
+ * A draft carrying a rule's link is held unless the link is exactly the one
+ * on file, it's a one-to-one message (not a social post), and what the lead
+ * said matches every requireLeadPatterns entry. Runs at the top of
+ * checkMedicareQuoteLink, so every agent that checks quote links checks
+ * these too. Returns { hold: false } or { hold: true, reason }.
+ */
+function checkLinkRules(messageText, { brain, leadText } = {}) {
+  const text = messageText || '';
+  const clean = (u) => u.replace(/[).,;:!?'"]+$/, '');
+  for (const rule of brain?.linkRules || []) {
+    const re = new RegExp(rule.matchPattern, 'gi');
+    const found = text.match(re);
+    if (!found) continue;
+    const allowed = [rule.url, ...(rule.aliases || [])];
+    if (found.some((u) => !allowed.includes(clean(u)))) {
+      return { hold: true, reason: `Draft's ${rule.label} doesn't match the one on file (${rule.url}). Held for Dr. Grove.` };
+    }
+    if (leadText === null) {
+      return { hold: true, reason: `The ${rule.label} is for one-to-one messages, not social posts.` };
+    }
+    const missing = (rule.requireLeadPatterns || []).find((r) => !new RegExp(r.pattern, 'i').test(leadText || ''));
+    if (missing) {
+      return { hold: true, reason: `Draft includes the ${rule.label}, but the lead hasn't ${missing.label}. Held for Dr. Grove.` };
+    }
+  }
+  return { hold: false };
+}
+
 function checkMedicareQuoteLink(messageText, { brain, leadText } = {}) {
   const text = messageText || '';
+  const linkRule = checkLinkRules(text, { brain, leadText });
+  if (linkRule.hold) return linkRule;
   if (!QUOTE_SITE_PATTERN.test(text)) return { hold: false };
 
   const mq = brain?.medicareQuoting;
@@ -397,6 +429,7 @@ module.exports = {
   INVESTMENT_TOPIC_PATTERNS,
   ensureMedicareDisclaimer,
   checkMedicareQuoteLink,
+  checkLinkRules,
   MEDICARE_INTEREST_PATTERN,
   medicareAreaFor,
   leadZip,
