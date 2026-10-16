@@ -177,6 +177,22 @@ function isAgentTag(tag, brain) {
   return own.includes(String(tag).toLowerCase());
 }
 
+/**
+ * A contact the agent has already worked keeps the brain it was worked
+ * under. Grove Financial Group and its agency share one GoHighLevel
+ * account, so one "Customer Replied" workflow serves both: an agency
+ * recruit's reply is answered by the agency brain even if the webhook
+ * names grove-financial (or nothing). Falls back to the requested brain
+ * when the contact is new or its brain isn't served by this deployment.
+ */
+function brainForContact(contactId, requested) {
+  const known = contactId ? db.findLeadByGhlContactId(contactId) : null;
+  if (known && known.brand) {
+    try { return loadBrain(known.brand); } catch { /* not served here */ }
+  }
+  return loadBrain(requested);
+}
+
 /** Every outbound draft passes both checks: advisory content and the client's separation rule. */
 function checkOutbound(channel, text, brain) {
   const advisory = checkAdvisoryAutoSend(channel, text, brain);
@@ -498,7 +514,7 @@ app.post('/webhook/reply', checkToken, async (req, res) => {
     if (!r.replyText) {
       console.warn('Reply webhook with no message text. Keys received:', Object.keys(req.body || {}).join(', '));
     }
-    const brain = loadBrain(req.body.brand || req.query.brand);
+    const brain = brainForContact(r.ghlContactId, req.body.brand || req.query.brand);
     if (!packages.hasFeature(brain, 'replyAgent')) {
       return res.json({ skipped: 'package', reason: packages.lockedMessage(brain, 'replyAgent'), contactId: r.ghlContactId });
     }
@@ -660,7 +676,7 @@ app.post('/webhook/status', checkToken, async (req, res) => {
     if (!STATUS_SYNC[status]) return res.status(400).json({ error: `status must be one of: ${Object.keys(STATUS_SYNC).join(', ')}` });
     if (!contactId) return res.status(400).json({ error: 'no contact id in the status webhook' });
 
-    const statusBrain = loadBrain(b.brand || req.query.brand);
+    const statusBrain = brainForContact(contactId, b.brand || req.query.brand);
     if (!packages.hasFeature(statusBrain, 'statusSync')) {
       return res.json({ skipped: 'package', reason: packages.lockedMessage(statusBrain, 'statusSync'), contactId });
     }
