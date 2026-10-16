@@ -162,6 +162,15 @@ function brainToSystemPrompt(brain) {
       ? `PENDING COMPLIANCE APPROVAL - these workflows are switched OFF. Do not offer, describe, or write messaging for them, and do not invent a substitute: ${brain.pendingWorkflows.join('; ')}. If a lead raises one of these topics, use the General Conversation offer (an invitation to talk with Dr. Grove) and nothing more.`
       : '',
     `VALUE PROPS: ${(brain.valueProps || []).join('; ')}`,
+    brain.partnersPage ? `Referral partner page (for CPAs, accounting firms and attorneys): ${brain.partnersPage}` : '',
+    brain.partnerContent
+      ? [
+          `CONTENT TOPICS BY AUDIENCE (for emails, social posts and talking points; educational, no numbers that aren't in APPROVED FACTS):`,
+          ...Object.entries(brain.partnerContent)
+            .filter(([k, v]) => !k.startsWith('_') && Array.isArray(v))
+            .map(([k, v]) => `- ${k}: ${v.join(' / ')}`),
+        ].join('\n')
+      : '',
     brain.donorRules?.handoffThreshold
       ? `HANDOFF AMOUNT: the handoff amount is $${Number(brain.donorRules.handoffThreshold).toLocaleString('en-US')}. Only a gift or pledge of $${Number(brain.donorRules.handoffThreshold).toLocaleString('en-US')} or more goes to Dr. Grove because of its size (the system checks the amount itself). A smaller gift or pledge (for example $25, $100 or $1,000) is NOT a handoff on amount alone: thank them warmly and give the next step (the giving page, or a simple payment schedule for a pledge) - unless something else in the escalation rules applies.`
       : '',

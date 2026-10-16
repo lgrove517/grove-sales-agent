@@ -183,6 +183,14 @@ function ensureMedicareDisclaimer(messageText, { brain, lead, anyMedicareMention
     (anyMedicareMention && /\bmedicare\b/i.test(text));
   const alreadyDisclosed = lower.includes('we do not offer every plan available in your area');
 
+  // A brain that never markets plans to Medicare beneficiaries (the GFG
+  // agency, which talks to agents and professionals) opts out with
+  // "compliance": { "medicareConsumerDisclaimer": false }. Quoting and SOA
+  // links are still held for it by checkMedicareQuoteLink.
+  if (brain?.compliance?.medicareConsumerDisclaimer === false) {
+    return { messageText: text, disclaimerAppended: false };
+  }
+
   if (!mentionsMedicarePlan || alreadyDisclosed) {
     return { messageText: text, disclaimerAppended: false };
   }
@@ -361,7 +369,9 @@ function largestAmount(text) {
  * { reason, tagKey } where tagKey is looked up in brain.agentTags.
  */
 function detectDonorHandoff(text, brain) {
-  const rules = brain?.donorRules;
+  // donorRules (Village Covenant Foundation) or handoffRules (any other
+  // brain, e.g. the agency's securities / referral-fee / consumer routing).
+  const rules = brain?.donorRules || brain?.handoffRules;
   if (!rules || !text) return null;
   const amount = largestAmount(text);
   if (rules.handoffThreshold && amount >= rules.handoffThreshold) {
