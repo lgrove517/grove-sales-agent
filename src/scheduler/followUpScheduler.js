@@ -155,17 +155,26 @@ function startScheduler({ brand } = {}) {
   const minutes = Number(process.env.FOLLOWUP_SWEEP_INTERVAL_MINUTES) || 60;
   const everyMs = minutes * 60 * 1000;
 
-  intervalHandle = setInterval(() => {
-    runFollowUpSweep({ brand }).catch((err) => {
-      console.error('[scheduler] follow-up sweep failed:', err);
-    });
+  // SCHEDULER_BRAINS=grove-financial,gfg-agency sweeps each of those
+  // clients in turn; unset, it sweeps DEFAULT_BRAIN only (as before).
+  const brands = brand
+    ? [brand]
+    : String(process.env.SCHEDULER_BRAINS || '').split(',').map((b) => b.trim()).filter(Boolean);
+  const list = brands.length ? brands : [undefined];
+
+  intervalHandle = setInterval(async () => {
+    for (const b of list) {
+      await runFollowUpSweep({ brand: b }).catch((err) => {
+        console.error(`[scheduler] follow-up sweep failed${b ? ` for ${b}` : ''}:`, err);
+      });
+    }
   }, everyMs);
 
   // Don't let this timer keep the process alive on its own (mainly matters
   // for tests/scripts that import this module without running a server).
   if (typeof intervalHandle.unref === 'function') intervalHandle.unref();
 
-  console.log(`[scheduler] Auto follow-up sweep is ON, running every ${minutes} minute(s).`);
+  console.log(`[scheduler] Auto follow-up sweep is ON, running every ${minutes} minute(s) for ${list.map((b) => b || process.env.DEFAULT_BRAIN || 'grove-financial').join(', ')}.`);
   return intervalHandle;
 }
 
