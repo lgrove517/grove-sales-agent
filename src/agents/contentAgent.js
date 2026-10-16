@@ -15,6 +15,13 @@ are the APPROVED FACTS listed above; everything else (state or local costs,
 averages, survey results) must be [ADD REAL NUMBER]. Biographical details
 about Dr. Grove must come from the brain above - never add new ones.
 
+If the instruction is a question or feedback rather than a request for new
+drafts (for example "why isn't Arizona listed?"), still answer in the JSON
+below: put your answer in "notes" and leave "drafts" empty, or include revised
+drafts if that is what they are asking for. Each instruction arrives on its
+own - you cannot see earlier drafts, so if they refer to one, say so and ask
+them to include the details in one instruction.
+
 Output STRICT JSON only:
 {
   "format": "social_post" | "email" | "ad_copy" | "other",
@@ -43,7 +50,9 @@ async function draftContent({ brain, instruction }) {
     try {
       parsed = JSON.parse(extractJson(result.text));
     } catch (err) {
-      parsed = { format: 'other', drafts: [], notes: `parse error: ${err.message}. Raw: ${result.text}` };
+      // The model answered in plain words (usually a question or feedback,
+      // not a draft request). Show its answer as-is instead of an error.
+      parsed = { format: 'other', drafts: [], notes: String(result.text || '').trim() };
     }
   }
 
