@@ -107,13 +107,14 @@
     ]
   },
   "idealCustomerProfile": {
-    "description": "Three audiences. AGENTS: licensed Medicare agents and licensed Property & Casualty agents (any experience level) who want carrier contracts through an agency with real mentorship, training, case design help and marketing systems; also newly licensed or developing agents who want mentorship and training to grow their business. PROFESSIONALS: CPAs, accounting firms and estate planning attorneys whose clients are approaching or in retirement, own businesses, or are settling estate plans - who want a trusted, credentialed insurance and retirement-income specialist to refer to, and who value referrals back.",
+    "description": "Audiences. AGENTS: licensed Medicare agents and licensed Property & Casualty agents (any experience level) who want carrier contracts through an agency with real mentorship, training, case design help and marketing systems; also newly licensed or developing agents who want mentorship and training to grow their business. PROFESSIONALS: CPAs, accounting firms and estate planning attorneys whose clients are approaching or in retirement, own businesses, or are settling estate plans - who want a trusted, credentialed insurance and retirement-income specialist to refer to, and who value referrals back. VETERANS: service members leaving the military and recent veterans (often from the Indeed veterans job post or the /veterans/ page) who are exploring a career as a licensed insurance professional and want mentorship from a fellow veteran.",
     "goodFitSignals": [
       "Holds an active insurance license (life & health, P&C) or is in pre-licensing",
       "Sells or wants to sell Medicare, life, annuities or long-term care",
       "Asks about mentorship, training, case design, marketing or contracting",
       "CPA, enrolled agent, accounting firm or estate planning / elder law attorney",
-      "Mentions clients approaching retirement, business owners, or estate plans that need funding or liquidity"
+      "Mentions clients approaching retirement, business owners, or estate plans that need funding or liquidity",
+      "Is a veteran or transitioning service member exploring a career as an insurance professional (source mentions Indeed, veterans, or the /veterans/ page)"
     ],
     "disqualifyingSignals": [
       "Explicitly says they are not interested",
@@ -134,6 +135,11 @@
       "cta": "Book a 20-minute Agent Discovery Call with Leon Grove"
     },
     {
+      "name": "Veteran Career Conversation - Transitioning Service Members and Veterans",
+      "description": "For service members leaving the military and recent veterans who are exploring a career as a licensed insurance professional. A no-pressure, veteran-to-veteran conversation with Leon Grove, a 14-year Marine Corps veteran who made this transition in 1997: whether the career fits their situation, how licensing works (Leon provides a link to a pre-licensing course for those not yet licensed), how agents contract with carriers and are paid directly by the carrier, and what mentorship and the first ninety days look like. The role is independent and commission-based, with no salary; it is not a fit for someone who needs a guaranteed paycheck right away. Veterans who are not a fit still get pointed to transition resources (VA, DAV, the Transition Assistance Program, Hire Heroes USA) on the veterans page: https://grovefinancialgroupinc.com/veterans/",
+      "cta": "Book a 20-minute conversation with Leon Grove"
+    },
+    {
       "name": "Professional Partner Introduction - CPAs, Accounting Firms and Estate Planning Attorneys",
       "description": "A reciprocal referral relationship. Leon Grove handles the insurance and retirement-income side (income planning, life insurance for estate liquidity and business owners, long-term care, Medicare) and sends tax, accounting and legal work back to the partner. No referral fees either way - just good client service. Partners can also host a lunch-and-learn or co-host a client workshop with Leon.",
       "cta": "Book a 20-minute Professional Partner Introduction with Leon Grove"
@@ -145,7 +151,8 @@
     "Real mentorship and case design help, not a recruiting funnel",
     "A five-stage client-acquisition framework and AI-powered marketing systems agents can use in their own practice",
     "For CPAs and attorneys: a specialist who stays in his lane and sends tax and legal work back to you",
-    "Insurance licensed in Alabama, Florida, South Carolina, North Carolina and Arizona"
+    "Insurance licensed in Alabama, Florida, South Carolina, North Carolina and Arizona",
+    "For veterans: mentorship from a 14-year Marine Corps veteran who made the transition into insurance himself in 1997"
   ],
   "approvedAnswers": [
     {
@@ -162,11 +169,27 @@
     },
     {
       "q": "Do I need to be licensed?",
-      "a": "To contract with carriers, yes - an active state insurance license for the lines you'll write. If you're still in pre-licensing, the mentorship and training track is a good place to start; Leon can talk through the path on a call."
+      "a": "To sell and contract with carriers, yes - an active insurance license in each state where you sell. If you're not licensed yet, Leon can send you a link to a pre-licensing course that covers your state's required hours; once it's done, you're eligible to sit for the state exam. The mentorship and training track is a good place to start in the meantime."
     },
     {
       "q": "Is this a W-2 job?",
       "a": "No. Agents are independent and contract with carriers through the agency. If you're looking for a salaried position, this probably isn't the right fit."
+    },
+    {
+      "q": "I'm still on active duty / haven't separated yet - is it too early?",
+      "a": "Not at all. Many people start studying for the state license exam before they separate, while they still have a steady paycheck. Leon is glad to talk through timing on a 20-minute call."
+    },
+    {
+      "q": "Do I need sales or insurance experience?",
+      "a": "No. You do need an insurance license in the state where you sell. If you're not licensed yet, Leon can send you a link to a pre-licensing course that covers your state's required hours, and then you can sit for the state exam. The mentorship track is built for people who are new."
+    },
+    {
+      "q": "Does the GI Bill pay for the license exam?",
+      "a": "It may. The VA can reimburse some licensing and certification test fees, so check with the VA about your own benefits. Leon can't confirm your eligibility."
+    },
+    {
+      "q": "Is there a salary or training pay?",
+      "a": "No. Agents are independent and earn commission from the carriers they contract with, and it takes time for income to build. Many veterans plan around retirement pay, savings or a spouse's income while they get started. If you need a guaranteed paycheck right away, this probably isn't the right fit yet."
     }
   ],
   "objectionHandling": {
