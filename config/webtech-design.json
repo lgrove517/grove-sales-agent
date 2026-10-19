@@ -61,9 +61,9 @@
   },
 
   "idealCustomerProfile": {
-    "description": "Three priority markets, any location: (1) REAL ESTATE AGENTS - especially newer agents and agents who work another job, who lose buyers and sellers because they can't answer fast enough; (2) CPAs AND TAX PROFESSIONALS - small firms and solo practitioners drowning in client intake, document collection and the same questions every season; (3) MEDICAL GROUPS AND DENTAL PRACTICES - independent practices losing patients to missed calls, no-shows and patients who never come back for their next visit. Decision makers: the agent, firm owner, practice owner or practice/office manager.",
+    "description": "Priority markets, any location (start here): (1) REAL ESTATE AGENTS - especially newer agents and agents who work another job, who lose buyers and sellers because they can't answer fast enough; (2) CPAs AND TAX PROFESSIONALS - small firms and solo practitioners drowning in client intake, document collection and the same questions every season; (3) MEDICAL GROUPS AND DENTAL PRACTICES - independent practices losing patients to missed calls, no-shows and patients who never come back for their next visit. Decision makers: the agent, firm owner, practice owner or practice/office manager. GROWTH MARKETS (welcome, same front door - the free systems review): (4) CHIROPRACTIC AND VETERINARY PRACTICES - owner-run practices losing new-patient inquiries, drop-offs mid care plan and overdue wellness visits; (5) LAW FIRMS - small and mid-size firms where the first firm to respond often wins the client, so intake speed matters; (6) HOME SERVICES (HVAC, plumbing, electrical) - owner-operators missing emergency and quote requests after hours and never following up on estimates.",
     "goodFitSignals": [
-      "Works in real estate, accounting/tax preparation, a medical group or a dental practice",
+      "Works in real estate, accounting/tax preparation, a medical group or a dental practice (priority), or runs a chiropractic or veterinary practice, a law firm, or a home-services company such as HVAC or plumbing (growth markets)",
       "Mentions missed calls, slow replies, leads going cold, no-shows, chasing paperwork, or not enough reviews",
       "Has no website, an outdated one, or one that doesn't capture leads",
       "Is growing or wants to grow without hiring more front-office staff",
@@ -96,6 +96,21 @@
     {
       "name": "Medical & Dental Practice System",
       "description": "For medical groups and dental practices. Missed-call text-back, online booking, appointment reminders that cut no-shows, recall messages that bring overdue patients back, and automatic review requests. Built so patient health details stay out of marketing messages; anything touching patient data is set up HIPAA-ready under a signed BAA. Pain to name: every missed call or empty appointment slot is lost revenue.",
+      "cta": "Book a free 20-minute systems review"
+    },
+    {
+      "name": "Chiropractic & Veterinary Practice System",
+      "description": "For chiropractors and veterinary clinics. Missed-call text-back, online booking, appointment and wellness reminders, reactivation messages for patients who dropped off a care plan or are overdue for a visit, and automatic review requests. For chiropractic, patient health details stay out of marketing messages and anything touching patient data is set up HIPAA-ready under a signed BAA. Pain to name: a full schedule depends on catching every new inquiry and bringing people back.",
+      "cta": "Book a free 20-minute systems review"
+    },
+    {
+      "name": "Law Firm Intake System",
+      "description": "For small and mid-size law firms. Fast replies to every new inquiry day or night, intake questions that sort inquiries by practice area, consultation booking, and follow-up for prospective clients who haven't scheduled yet. The system never evaluates a case or gives legal advice; the firm approves all intake wording under its own bar advertising rules. Pain to name: prospective clients often hire the first firm that responds.",
+      "cta": "Book a free 20-minute systems review"
+    },
+    {
+      "name": "Home Services System",
+      "description": "For HVAC, plumbing and electrical companies. Missed-call text-back for emergency and quote requests at any hour, online booking, follow-up on estimates that haven't been accepted, maintenance-plan renewal reminders and review requests. Pain to name: the company that answers first gets the job, and unanswered estimates are money left on the table.",
       "cta": "Book a free 20-minute systems review"
     }
   ],
@@ -148,8 +163,9 @@
       "Lead asks for exact pricing, a quote, a discount or contract terms",
       "Lead is an existing Webtech client with a support issue",
       "Lead mentions a complaint, legal threat or regulator",
-      "Lead asks for something outside the four offers on file",
-      "Lead requests to opt out or be removed from contact"
+      "Lead asks for something outside the offers on file",
+      "Lead requests to opt out or be removed from contact",
+      "Lead (a law firm) asks the system to assess a case, or a prospective legal client describes their legal matter - mark needs_human and draft nothing that repeats the details"
     ]
   },
 
