@@ -71,6 +71,11 @@ if (!leadColumns.includes('next_follow_up_at')) {
 if (!leadColumns.includes('postal_code')) {
   db.exec(`ALTER TABLE leads ADD COLUMN postal_code TEXT`);
 }
+// Test leads: marked from the command center so they drop out of the
+// lead list, briefings, reports and follow-ups (the row is kept).
+if (!leadColumns.includes('is_test')) {
+  db.exec(`ALTER TABLE leads ADD COLUMN is_test INTEGER DEFAULT 0`);
+}
 
 function insertLead(lead) {
   const stmt = db.prepare(`
@@ -89,7 +94,30 @@ function insertLead(lead) {
     status: lead.status || 'new',
     ghlContactId: lead.ghlContactId || null,
   });
+  // A contact already marked as a test stays a test when GHL re-sends it.
+  if (lead.ghlContactId) {
+    db.prepare(`
+      UPDATE leads SET is_test = 1 WHERE id = ? AND EXISTS (
+        SELECT 1 FROM leads WHERE ghl_contact_id = ? AND is_test = 1 AND id != ?)
+    `).run(info.lastInsertRowid, lead.ghlContactId, info.lastInsertRowid);
+  }
   return info.lastInsertRowid;
+}
+
+/**
+ * Mark (or unmark) a lead as a test. Every copy of the same GHL contact in
+ * the same brand is marked too, so a re-send doesn't bring it back.
+ * Returns the number of rows changed (0 = no such lead in this brand).
+ */
+function setLeadTest(leadId, brand, isTest = true) {
+  const lead = db.prepare(`SELECT * FROM leads WHERE id = ? AND brand = ?`).get(leadId, brand);
+  if (!lead) return 0;
+  const flag = isTest ? 1 : 0;
+  if (lead.ghl_contact_id) {
+    return db.prepare(`UPDATE leads SET is_test = ? WHERE brand = ? AND (id = ? OR ghl_contact_id = ?)`)
+      .run(flag, brand, leadId, lead.ghl_contact_id).changes;
+  }
+  return db.prepare(`UPDATE leads SET is_test = ? WHERE id = ?`).run(flag, leadId).changes;
 }
 
 function updateLeadStatus(leadId, status) {
@@ -136,13 +164,16 @@ function recordFollowUpAttempt(leadId, attemptNumber, nextFollowUpAt) {
   );
 }
 
-function listLeads({ brand, limit = 50 } = {}) {
+// Test leads are left out unless includeTest is set, so the scheduler,
+// the command center and the agents never work them.
+function listLeads({ brand, limit = 50, includeTest = false } = {}) {
+  const notTest = includeTest ? '' : 'AND is_test = 0';
   if (brand) {
     return db
-      .prepare(`SELECT * FROM leads WHERE brand = ? ORDER BY created_at DESC LIMIT ?`)
+      .prepare(`SELECT * FROM leads WHERE brand = ? ${notTest} ORDER BY created_at DESC LIMIT ?`)
       .all(brand, limit);
   }
-  return db.prepare(`SELECT * FROM leads ORDER BY created_at DESC LIMIT ?`).all(limit);
+  return db.prepare(`SELECT * FROM leads WHERE 1 = 1 ${notTest} ORDER BY created_at DESC LIMIT ?`).all(limit);
 }
 
 function logEvent({ leadId, agent, action, detail, dryRun }) {
@@ -194,7 +225,7 @@ function setLastVisit(username, brand, when = new Date()) {
 /** Leads for one client created after `since` (newest first). */
 function leadsSince(brand, since) {
   return db
-    .prepare(`SELECT * FROM leads WHERE brand = ? AND created_at > ? ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM leads WHERE brand = ? AND created_at > ? AND is_test = 0 ORDER BY created_at DESC`)
     .all(brand, since);
 }
 
@@ -208,7 +239,7 @@ function eventsSince(brand, since) {
     .prepare(`
       SELECT e.*, l.first_name, l.last_name, l.status AS lead_status
       FROM events e JOIN leads l ON l.id = e.lead_id
-      WHERE l.brand = ? AND e.created_at > ?
+      WHERE l.brand = ? AND e.created_at > ? AND l.is_test = 0
       ORDER BY e.created_at DESC
     `)
     .all(brand, since);
@@ -224,7 +255,7 @@ function commandsSince(brand, since) {
 /** Leads that are waiting on a human right now, oldest first. */
 function leadsNeedingHuman(brand, limit = 10) {
   return db
-    .prepare(`SELECT * FROM leads WHERE brand = ? AND status = 'needs_human' ORDER BY created_at ASC LIMIT ?`)
+    .prepare(`SELECT * FROM leads WHERE brand = ? AND status = 'needs_human' AND is_test = 0 ORDER BY created_at ASC LIMIT ?`)
     .all(brand, limit);
 }
 
@@ -255,18 +286,19 @@ function pipelineStats(brand, days = 30) {
     Object.fromEntries(db.prepare(sql).all(...args).map((r) => [r.k || 'unknown', r.n]));
   return {
     windowDays: days,
-    totalLeads: count(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND created_at > ? AND status != 'superseded'`, brand, since),
-    leadsBySource: group(`SELECT source k, COUNT(*) n FROM leads WHERE brand = ? AND created_at > ? AND status != 'superseded' GROUP BY source`, brand, since),
-    leadsByStatus: group(`SELECT status k, COUNT(*) n FROM leads WHERE brand = ? AND created_at > ? AND status != 'superseded' GROUP BY status`, brand, since),
+    totalLeads: count(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND created_at > ? AND status != 'superseded' AND is_test = 0`, brand, since),
+    leadsBySource: group(`SELECT source k, COUNT(*) n FROM leads WHERE brand = ? AND created_at > ? AND status != 'superseded' AND is_test = 0 GROUP BY source`, brand, since),
+    leadsByStatus: group(`SELECT status k, COUNT(*) n FROM leads WHERE brand = ? AND created_at > ? AND status != 'superseded' AND is_test = 0 GROUP BY status`, brand, since),
     agentActions: group(`
       SELECT e.action k, COUNT(*) n FROM events e JOIN leads l ON l.id = e.lead_id
-      WHERE l.brand = ? AND e.created_at > ? GROUP BY e.action`, brand, since),
-    waitingOnYouNow: count(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND status = 'needs_human'`, brand),
-    allTimeBooked: count(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND status IN ('booked','won')`, brand),
+      WHERE l.brand = ? AND e.created_at > ? AND l.is_test = 0 GROUP BY e.action`, brand, since),
+    waitingOnYouNow: count(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND status = 'needs_human' AND is_test = 0`, brand),
+    allTimeBooked: count(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND status IN ('booked','won') AND is_test = 0`, brand),
   };
 }
 
 module.exports = {
+  setLeadTest,
   setLeadPostalCode,
   toDbTime,
   getLastVisit,
