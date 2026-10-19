@@ -44,13 +44,13 @@ function buildMonthlyReport({ brain, instruction, now = new Date() }) {
   const n = (sql, ...a) => db.db.prepare(sql).get(...a).n;
 
   // Leads that came in this month (re-sends of the same contact count once).
-  const leadsIn = n(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND created_at >= ? AND created_at < ? AND status != 'superseded'`, brand, start, end);
-  const bySource = q(`SELECT COALESCE(source,'unknown') k, COUNT(*) n FROM leads WHERE brand = ? AND created_at >= ? AND created_at < ? AND status != 'superseded' GROUP BY k ORDER BY n DESC`, brand, start, end);
+  const leadsIn = n(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND created_at >= ? AND created_at < ? AND status != 'superseded' AND is_test = 0`, brand, start, end);
+  const bySource = q(`SELECT COALESCE(source,'unknown') k, COUNT(*) n FROM leads WHERE brand = ? AND created_at >= ? AND created_at < ? AND status != 'superseded' AND is_test = 0 GROUP BY k ORDER BY n DESC`, brand, start, end);
 
   // What the agents did for this client's leads this month.
   const actions = Object.fromEntries(q(`
     SELECT e.agent || ':' || e.action k, COUNT(*) n FROM events e JOIN leads l ON l.id = e.lead_id
-    WHERE l.brand = ? AND e.created_at >= ? AND e.created_at < ? GROUP BY k`, brand, start, end).map((r) => [r.k, r.n]));
+    WHERE l.brand = ? AND e.created_at >= ? AND e.created_at < ? AND l.is_test = 0 GROUP BY k`, brand, start, end).map((r) => [r.k, r.n]));
   const sum = (pred) => Object.entries(actions).filter(([k]) => pred(k)).reduce((t, [, v]) => t + v, 0);
 
   const qualified = sum((k) => k === 'leadQualifier:qualified');
