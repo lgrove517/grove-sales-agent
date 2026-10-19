@@ -194,6 +194,9 @@
   .btn { background: var(--gold); color: var(--forest); border: none; border-radius: 8px; padding: 8px 14px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; cursor: pointer; }
   .btn.ghost { background: none; border: 1px solid rgba(0,56,64,0.3); color: var(--forest); }
   .btn:disabled { opacity: .6; cursor: default; }
+  .btn.small { padding: 4px 10px; font-size: 13px; }
+  .leads-note { font-size: 13px; margin: 8px 0 0; }
+  .leads-note button { background: none; border: none; color: var(--forest); text-decoration: underline; cursor: pointer; font: inherit; padding: 0 0 0 6px; }
   .rec { background: #fff; border: 1px solid rgba(0,56,64,0.15); border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.5; }
   .rec .r-title { font-weight: 600; }
   .rec .r-try { margin-top: 6px; }
@@ -255,9 +258,10 @@
   <section class="card">
     <h2>Recent leads</h2>
     <table id="leads-table">
-      <thead><tr><th>Name</th><th>Status</th><th>Source</th></tr></thead>
+      <thead><tr><th>Name</th><th>Status</th><th>Source</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
+    <p class="leads-note" id="leads-note" hidden></p>
   </section>
 </main>
 
@@ -358,11 +362,50 @@
       (data.leads || []).filter((l) => l.status !== 'superseded').forEach((l) => {
         const tr = document.createElement('tr');
         tr.innerHTML = '<td>' + escapeHtml([l.first_name, l.last_name].filter(Boolean).join(' ')) + '</td>' +
-          '<td>' + escapeHtml(STATUS_LABELS[l.status] || l.status || '') + '</td><td>' + escapeHtml(l.source || '') + '</td>';
+          '<td>' + escapeHtml(STATUS_LABELS[l.status] || l.status || '') + '</td><td>' + escapeHtml(l.source || '') + '</td>' +
+          '<td><button type="button" class="btn ghost small" data-test-lead="' + Number(l.id) + '" title="Hide this lead and stop its follow-ups">Mark as test</button></td>';
         tbody.appendChild(tr);
       });
     } catch {}
   }
+
+  // "Mark as test": hides the lead and stops its follow-ups. The lead stays
+  // in the database, and the note under the table offers an Undo.
+  async function setLeadTest(id, test) {
+    const res = await fetch('/api/leads/' + id + '/test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ brand: currentBrand() || undefined, test }),
+    });
+    if (redirectIfSignedOut(res)) return false;
+    return res.ok;
+  }
+
+  document.querySelector('#leads-table tbody').addEventListener('click', async function (e) {
+    const btn = e.target.closest('[data-test-lead]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-test-lead');
+    const name = btn.closest('tr').firstElementChild.textContent || 'This lead';
+    btn.disabled = true;
+    const note = document.getElementById('leads-note');
+    if (await setLeadTest(id, true)) {
+      note.textContent = name + ' was marked as a test lead. It is hidden and will get no follow-ups.';
+      const undo = document.createElement('button');
+      undo.type = 'button';
+      undo.textContent = 'Undo';
+      undo.addEventListener('click', async function () {
+        if (await setLeadTest(id, false)) { note.hidden = true; refreshLeads(); refreshBriefing(); }
+      });
+      note.appendChild(undo);
+      note.hidden = false;
+      refreshLeads();
+      refreshBriefing();
+    } else {
+      btn.disabled = false;
+      note.textContent = 'Could not mark that lead as a test. Please try again.';
+      note.hidden = false;
+    }
+  });
 
   function addLogEntry(instruction, result) {
     const div = document.createElement('div');
