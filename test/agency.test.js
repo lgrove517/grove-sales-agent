@@ -20,6 +20,11 @@ test('prompt names all three offers', () => {
   const p = brainToSystemPrompt(agency);
   assert(p.includes('Agent Discovery Call') && p.includes('Mentorship and Training') && p.includes('Professional Partner Introduction'));
 });
+test('prompt carries the veteran career offer and page', () => {
+  const p = brainToSystemPrompt(agency);
+  assert(p.includes('Veteran Career Conversation') && p.includes('grovefinancialgroupinc.com/veterans/'));
+});
+test('veteran income claim is held', () => assert(held('As a veteran you could make $100,000 your first year.')));
 test('prompt carries partner content topics', () => assert(brainToSystemPrompt(agency).includes('Estate liquidity')));
 test('prompt says no referral fees', () => assert(/no referral fees/i.test(brainToSystemPrompt(agency))));
 test('prompt never uses Dr. in messages rule', () => assert(brainToSystemPrompt(agency).includes('never with "Dr." in front')));
