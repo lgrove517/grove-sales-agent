@@ -833,6 +833,22 @@ app.get('/api/leads', requireAuth, (req, res) => {
   res.json({ leads: db.listLeads({ brand: req.query.brand, limit: 50 }) });
 });
 
+// Mark a lead as a test (or undo it) from the Recent leads list. Test leads
+// are kept in the database but drop out of the list, briefings, reports and
+// the follow-up scheduler.
+app.post('/api/leads/:id/test', requireAuth, (req, res) => {
+  try {
+    const brain = loadBrain(req.body.brand);
+    const isTest = req.body.test !== false;
+    const changed = db.setLeadTest(Number(req.params.id), brain.clientId, isTest);
+    if (!changed) return res.status(404).json({ error: 'Lead not found for this client.' });
+    db.logEvent({ leadId: Number(req.params.id), agent: 'dashboard', action: isTest ? 'marked_test' : 'unmarked_test', detail: { by: req.session.username || 'dashboard' }, dryRun: false });
+    res.json({ ok: true, changed, test: isTest });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/activity', requireAuth, (req, res) => {
   res.json({ events: db.listEvents({ limit: 50 }), commands: db.listCommands({ limit: 20 }) });
 });
