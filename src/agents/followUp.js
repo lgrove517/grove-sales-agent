@@ -138,4 +138,97 @@ function extractJson(text) {
   return match ? match[0] : text;
 }
 
-module.exports = { draftFollowUp };
+// --- Phase 1 booking sequence: day 1 / 3 / 7 follow-ups ----------------------
+const { sendSequenceTouch } = require('./sequenceTouch');
+
+const SEQUENCE_PROMPT = `
+You are the FOLLOW-UP agent writing one step of a short booking sequence.
+This person ASKED to hear from the business (form, referral or survey) and
+has not booked a time yet. The only goal is to get them to pick a time on
+the scheduling page.
+
+Rules:
+- Personal: use their first name and what they asked about, if known.
+- Short. Email: 2-4 sentences plus a one-line subject. Text: 1-2 sentences.
+- Do NOT include any link, URL or web address. The scheduling link is added
+  on its own line automatically, right after your message - end with a
+  sentence that leads into it (for example "Pick whatever time suits you.").
+- Do NOT add a sign-off, signature, opt-out or unsubscribe line; those are
+  added automatically too.
+- Each step is lower-key than the last. The final step is a gracious
+  "the door's open whenever you're ready" note - never pushy, no urgency.
+
+Output STRICT JSON only:
+{ "shouldSend": true | false, "reason": "one sentence if not sending", "subject": "email subject, or empty for a text", "message": "the message body" }
+`.trim();
+
+const STEP_GUIDANCE = [
+  'Step 1 of 3: a friendly, helpful nudge. Mention what they asked about and that a short conversation is free and no-obligation.',
+  'Step 2 of 3: very brief and light. A quick check-in, one easy reason to talk.',
+  'Step 3 of 3 (last): gracious close. No pressure; the door stays open and they can pick a time whenever they are ready.',
+];
+
+/**
+ * Drafts and sends one follow-up step of the booking sequence. Returns
+ * { sent, held, reason, mode, message, channel }; the caller advances or
+ * holds the lead's sequence from that.
+ */
+async function draftSequenceFollowUp({ brain, cfg, lead, stepIndex, channel }) {
+  const guidance = STEP_GUIDANCE[Math.min(stepIndex, STEP_GUIDANCE.length - 1)];
+  const userMessage = [
+    `Lead first name: ${lead.firstName || '(unknown - use a friendly greeting without a name)'}`,
+    `Channel: ${channel === 'SMS' ? 'Text message (SMS)' : 'Email'}`,
+    `Day ${cfg.steps[stepIndex].day} after they asked to hear from us.`,
+    `How they reached us: ${lead.source || 'a form'}`,
+    `What they asked about: ${lead.interest || '(nothing specific - keep it general per the marketing approach)'}`,
+    guidance,
+  ].join('\n');
+
+  const result = await askClaude({
+    system: `${brainToSystemPrompt(brain)}\n\n${SEQUENCE_PROMPT}`,
+    messages: [{ role: 'user', content: userMessage }],
+  });
+
+  let parsed;
+  if (result.dryRun) {
+    parsed = { shouldSend: true, reason: 'DRY_RUN', subject: `Following up - ${brain.businessName}`, message: `[DRY_RUN] Sequence step ${stepIndex + 1} for ${lead.firstName || 'lead'}.` };
+  } else {
+    try {
+      parsed = JSON.parse(extractJson(result.text));
+    } catch (err) {
+      parsed = { shouldSend: false, reason: `Could not read the drafted message (${err.message}).`, subject: '', message: '' };
+    }
+  }
+
+  let reason = parsed.reason;
+  let message = String(parsed.message || '').trim();
+  let shouldSend = parsed.shouldSend !== false && Boolean(message);
+  if (!message) reason = reason || 'No message was drafted.';
+
+  if (shouldSend) {
+    const medicare = ensureMedicareDisclaimer(message, { brain, lead });
+    message = medicare.messageText;
+    if (medicare.needsArea) { shouldSend = false; reason = medicare.reason; }
+  }
+  if (shouldSend) {
+    const qlink = checkMedicareQuoteLink(message, { brain, leadText: lead.interest || '' });
+    if (qlink.hold) { shouldSend = false; reason = qlink.reason; }
+  }
+
+  let touch = { sent: false, held: true, reason, message };
+  if (shouldSend) {
+    touch = await sendSequenceTouch({ brain, cfg, lead, step: stepIndex + 1, channel, text: message, subject: parsed.subject });
+  }
+
+  db.logEvent({
+    leadId: lead.id,
+    agent: 'followUp',
+    action: touch.sent ? `sequence_step_${stepIndex + 1}` : 'sequence_held',
+    detail: { channel, day: cfg.steps[stepIndex].day, reason: touch.reason, message: touch.message, mode: touch.mode, link: touch.link },
+    dryRun: result.dryRun || touch.mode === 'dry_run',
+  });
+
+  return { ...touch, channel, dryRun: result.dryRun };
+}
+
+module.exports = { draftFollowUp, draftSequenceFollowUp };

@@ -6,6 +6,7 @@ const { runFollowUpSweep } = require('../scheduler/followUpScheduler');
 const { buildBriefing, recommend } = require('./briefing');
 const { buildSocialCalendar } = require('./socialCalendar');
 const { buildMonthlyReport } = require('./monthlyReport');
+const { buildBookingReport, parseSpend } = require('./bookingReport');
 const { hasFeature, lockedMessage } = require('../config/packages');
 const { brainToSystemPrompt } = require('../config/loadBrain');
 const db = require('../store/db');
@@ -20,6 +21,8 @@ const INTENT_FEATURE = {
   briefing: 'briefing',
   recommendations: 'recommendations',
   monthly_report: 'monthlyReport',
+  booking_report: 'monthlyReport',
+  set_spend: 'monthlyReport',
 };
 
 const ROUTER_PROMPT = `
@@ -43,6 +46,11 @@ one of these intents and extract any parameters mentioned:
   more booked appointments, or grow the pipeline
 - "monthly_report": they want the monthly results report / numbers for a
   month, e.g. "monthly report", "September results", "report for this month"
+- "booking_report": they want the booking-sequence numbers: opens, clicks,
+  booked appointments, cost per booked appointment, e.g. "booking report",
+  "cost per appointment", "how is the booking sequence doing?"
+- "set_spend": they are telling you how much they spent on ads or leads
+  from a source, e.g. "spent $250 on Facebook in November"
 - "ask": a question or comment for the assistant itself rather than a task,
   e.g. "why isn't Arizona listed?", "which states am I licensed in?", "what
   does the agent do when someone asks about a 401(k)?", "is this compliant?"
@@ -50,7 +58,7 @@ one of these intents and extract any parameters mentioned:
 
 Output STRICT JSON only:
 {
-  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "ask" | "unknown",
+  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "booking_report" | "set_spend" | "ask" | "unknown",
   "leadName": "name mentioned, if any, else empty string",
   "cleanedInstruction": "the instruction, lightly cleaned up, to hand to the specialist agent"
 }
@@ -60,6 +68,12 @@ Output STRICT JSON only:
  * command center still does something sensible without a live LLM call. */
 function ruleBasedRoute(instruction) {
   const lower = instruction.toLowerCase();
+  if (/\b(spent|ad spend|ad budget|spend)\b/.test(lower) && /\d/.test(lower) && !/\breport\b/.test(lower)) {
+    return { intent: 'set_spend', leadName: '', cleanedInstruction: instruction };
+  }
+  if (/(booking (report|results|numbers|sequence)|cost per (booked )?(appointment|booking)|sequence (report|results)|truth dashboard)/.test(lower)) {
+    return { intent: 'booking_report', leadName: '', cleanedInstruction: instruction };
+  }
   if (/(monthly (results|report|summary)|results (report|summary)|^(show |get |run )?(the |my )?report for\b|\b(results|numbers) for (this|last) month|\b(january|february|march|april|may|june|july|august|september|october|november|december) (results|report|numbers)\b)/.test(lower)) {
     return { intent: 'monthly_report', leadName: '', cleanedInstruction: instruction };
   }
@@ -128,6 +142,21 @@ async function runCommand({ brain, instruction, since }) {
   }
 
   switch (routed.intent) {
+    case 'booking_report': {
+      response = buildBookingReport({ brain, instruction });
+      break;
+    }
+    case 'set_spend': {
+      const parsed = parseSpend(instruction);
+      if (!parsed) {
+        response = { message: 'I could not read that. Try: "spent $250 on Facebook in November".' };
+      } else {
+        db.setSpend({ brand: brain.clientId, ...parsed });
+        const total = db.spendFor(brain.clientId, parsed.month);
+        response = { message: `Saved: $${parsed.amount.toLocaleString('en-US')} on ${parsed.source} for ${parsed.month}. Spend on file for that month: ${total.map((s) => `${s.source} $${s.amount.toLocaleString('en-US')}`).join(', ')}. Lead sources containing "${parsed.source}" count toward it in the booking report.` };
+      }
+      break;
+    }
     case 'monthly_report': {
       response = buildMonthlyReport({ brain, instruction: routed.cleanedInstruction || instruction });
       break;

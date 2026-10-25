@@ -43,6 +43,7 @@ async function qualifyLead({ brain, lead }) {
     `Source: ${lead.source || 'unknown'}`,
     `Message from lead: ${lead.message || '(none - contact details only, which is normal)'}`,
     lead.context ? `Other context: ${lead.context}` : '',
+    lead.writingNote ? `Writing note for the reply: ${lead.writingNote}` : '',
   ].filter(Boolean).join('\n');
 
   const result = await askClaude({
