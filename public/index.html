@@ -424,7 +424,7 @@
               return '<tr><td>' + escapeHtml(row[0]).replace(/^  /, '&nbsp;&nbsp;&nbsp;') + '</td><td><b>' + escapeHtml(row[1]) + '</b></td></tr>';
             }).join('') + '</tbody></table>';
         }).join('') +
-        '<div class="draft-head">Ready to send to the client</div>' +
+        '<div class="draft-head">' + escapeHtml(r.clientTextLabel || 'Ready to send to the client') + '</div>' +
         '<div class="draft"><button type="button" class="copy">Copy</button>' + escapeHtml(r.clientText || '') + '</div>';
     } else if (typeof r.message === 'string' && Object.keys(r).length === 1) {
       body = '<div class="card">' + escapeHtml(r.message) + '</div>';
