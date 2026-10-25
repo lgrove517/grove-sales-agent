@@ -1,5 +1,6 @@
 const fetch = require('node-fetch');
 const { AsyncLocalStorage } = require('async_hooks');
+const { ensureAnnuityDisclosure } = require('../config/complianceGuard');
 
 const API_VERSION = '2021-07-28';
 
@@ -126,6 +127,16 @@ async function sendMessage({ contactId, type, message, subject, html }) {
     const re = new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
     message = (message || '').replace(re, to);
     if (html) html = html.replace(re, to);
+  }
+  // Annuity / bank-product disclosure on any message that compares an
+  // insurance product to CDs or talks about principal protection.
+  const annuity = ensureAnnuityDisclosure(message, brainContext.getStore());
+  if (annuity.appended) {
+    message = annuity.messageText;
+    if (html) {
+      const fine = `<p style="font-size:12px;color:#666;">${annuity.disclosure.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`;
+      html = /<\/div>\s*$/.test(html) ? html.replace(/<\/div>\s*$/, `${fine}\n</div>`) : `${html}\n${fine}`;
+    }
   }
   if (isConfigured() && sendMode() !== 'live') {
     const note = [
