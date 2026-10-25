@@ -362,6 +362,34 @@ function ensureCanSpamFooter(channel, messageText, brain) {
 }
 
 /**
+ * Annuity / bank-product disclosure (Oct 25 2026, Dr. Grove's "Principal
+ * Protection Strategies"): any message that compares an insurance product to
+ * CDs or bank savings, or talks about principal protection, must say plainly
+ * that annuities are not bank deposits and not FDIC-insured, and that
+ * guarantees depend on the insurer. Appended in code, like the Medicare
+ * disclaimer, so it can't be forgotten. brain.annuityDisclosure overrides the
+ * wording; brains without the financial guards are left alone.
+ */
+const ANNUITY_DISCLOSURE =
+  'Annuities are insurance products, not bank deposits. They are not FDIC-insured, not guaranteed by any bank, and any guarantees are backed by the financial strength and claims-paying ability of the issuing insurance company.';
+const BANK_PRODUCT_PATTERN = /\b(?:CDs?|certificates? of deposit|bank savings|savings accounts?|money market|FDIC)\b/;
+const INSURANCE_PRODUCT_PATTERN = /\b(?:annuit\w*|IUL|indexed universal life|fixed indexed|principal protection)\b/i;
+
+function needsAnnuityDisclosure(text) {
+  const t = text || '';
+  return /principal protection/i.test(t) || (BANK_PRODUCT_PATTERN.test(t) && INSURANCE_PRODUCT_PATTERN.test(t));
+}
+
+function ensureAnnuityDisclosure(messageText, brain) {
+  const text = messageText || '';
+  if (brain && !financialGuardsOn(brain)) return { messageText: text, appended: false };
+  if (!needsAnnuityDisclosure(text)) return { messageText: text, appended: false };
+  const disclosure = (brain && brain.annuityDisclosure) || ANNUITY_DISCLOSURE;
+  if (/not fdic[- ]insured/i.test(text)) return { messageText: text, appended: false, disclosure };
+  return { messageText: `${text}\n\n${disclosure}`, appended: true, disclosure };
+}
+
+/**
  * Separation guard, configured per brain (compliance.blockedMentions): a
  * client like Village Covenant Foundation must never mention Dr. Grove's
  * advisory or insurance businesses or any financial product. Returns the
@@ -418,6 +446,9 @@ function detectDonorHandoff(text, brain) {
 }
 
 module.exports = {
+  ensureAnnuityDisclosure,
+  needsAnnuityDisclosure,
+  ANNUITY_DISCLOSURE,
   checkSeparation,
   detectDonorHandoff,
   largestAmount,
