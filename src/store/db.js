@@ -88,6 +88,15 @@ for (const [col, type] of [
   ['seq_step', 'INTEGER DEFAULT 0'],
   ['seq_started_at', 'TEXT'],
   ['booked_at', 'TEXT'],
+  // Phase 2 AI caller. call_status: scheduled, placed, review_ready,
+  // completed, no_answer, opted_out, wrong_number, cancelled, expired,
+  // excluded_medicare.
+  ['call_consent', 'INTEGER DEFAULT 0'],
+  ['call_status', 'TEXT'],
+  ['call_attempts', 'INTEGER DEFAULT 0'],
+  ['call_due_at', 'TEXT'],
+  ['call_last_at', 'TEXT'],
+  ['call_tz', 'TEXT'],
 ]) {
   if (!leadColumns.includes(col)) db.exec(`ALTER TABLE leads ADD COLUMN ${col} ${type}`);
 }
@@ -359,6 +368,27 @@ function activeSequenceLeads(brand) {
   return db.prepare(`SELECT * FROM leads WHERE brand = ? AND seq_status = 'active' AND is_test = 0 ORDER BY id`).all(brand);
 }
 
+/** Set any of the AI caller fields on a lead (only the keys given change). */
+function updateLeadCall(leadId, fields) {
+  const map = { callConsent: 'call_consent', callStatus: 'call_status', callAttempts: 'call_attempts', callDueAt: 'call_due_at', callLastAt: 'call_last_at', callTz: 'call_tz' };
+  const sets = []; const vals = [];
+  for (const [k, col] of Object.entries(map)) {
+    if (k in fields) { sets.push(`${col} = ?`); vals.push(typeof fields[k] === 'boolean' ? Number(fields[k]) : fields[k]); }
+  }
+  if (!sets.length) return 0;
+  return db.prepare(`UPDATE leads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, leadId).changes;
+}
+
+/** Scheduled AI calls that are due by `nowDb` (UTC "YYYY-MM-DD HH:MM:SS"), oldest first. */
+function dueCalls(brand, nowDb) {
+  return db.prepare(`SELECT * FROM leads WHERE brand = ? AND call_status = 'scheduled' AND call_due_at <= ? AND is_test = 0 ORDER BY call_due_at`).all(brand, nowDb);
+}
+
+/** Leads called (or readied in review mode) for a client since a time - for the daily cap. */
+function callsPlacedSince(brand, sinceDb) {
+  return db.prepare(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND call_last_at >= ? AND is_test = 0`).get(brand, sinceDb).n;
+}
+
 function insertTouch({ code, leadId, brand, step, channel, url, mode }) {
   db.prepare(`INSERT INTO touches (code, lead_id, brand, step, channel, url, mode) VALUES (?, ?, ?, ?, ?, ?, ?)`)
     .run(code, leadId, brand, step, channel, url, mode);
@@ -410,6 +440,9 @@ function spendFor(brand, month) {
 }
 
 module.exports = {
+  updateLeadCall,
+  dueCalls,
+  callsPlacedSince,
   updateLeadSequence,
   activeSequenceLeads,
   insertTouch,
