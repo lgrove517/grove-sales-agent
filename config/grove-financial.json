@@ -345,6 +345,22 @@
       "notes": "Researched Sep 18 2026 directly from each state insurance department's public administrative code (Alabama DOI, Arizona DIFI, Florida CFO/DFS, South Carolina DOI, North Carolina DOI) plus CMS's public Medicare marketing guidance - not yet reviewed by Dr. Grove's own FMO or carrier compliance contact. Two follow-ups worth doing before this governs real outbound insurance marketing at scale: (1) confirm the exact FL and NC disclosure clause text (see status above); (2) ask Dr. Grove's carriers whether any of them impose additional advertising pre-approval requirements on top of these state minimums."
     }
   },
+  "bookingSequence": {
+    "_comment": "Phase 1 (Oct 25 2026, Dr. Grove): email and text ONLY to people who asked to hear from Grove Financial Group - a form, a referral, a RetireFlo survey, or a contact tagged opt-in. Day 0 first touch, then day 1, 3 and 7, each with ONE link to the scheduling page; stops the moment they book, reply or opt out. Texts only go to contacts with text consent (tag sms-opt-in, set by the GHL form workflow when the SMS consent box is checked) - otherwise that step goes by email. GFG texts go from the approved local numbers only (GHL default 428-3113). Sends only 9 AM - 7 PM Central, Monday - Saturday. Change landingPageUrl when the new scheduling landing page is live. Sequence wording should go to compliance like the other workflows; review mode (GHL_SEND_MODE=review) keeps everything as notes until then.",
+    "enabled": true,
+    "landingPageUrl": "https://api.leadconnectorhq.com/widget/bookings/compliementary-financial-planning",
+    "firstTouchChannel": "Email",
+    "steps": [
+      { "day": 1, "channel": "Email" },
+      { "day": 3, "channel": "SMS" },
+      { "day": 7, "channel": "Email" }
+    ],
+    "optInSourcePatterns": ["form", "survey", "retireflo", "referral", "seminar", "landing"],
+    "optInTags": ["opt-in", "requested-info", "referral", "retireflo"],
+    "smsConsentTags": ["sms-opt-in"],
+    "sendWindow": { "timezone": "America/Chicago", "startHour": 9, "endHour": 19, "days": [1, 2, 3, 4, 5, 6] },
+    "utm": { "source": "sales-agent", "campaign": "gfg-booking-sequence" }
+  },
   "agents": {
     "leadQualifier": {
       "enabled": true

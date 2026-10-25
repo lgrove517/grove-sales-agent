@@ -54,6 +54,18 @@
     "requiredDisclosureFooter": ""
   },
 
+  "bookingSequence": {
+    "_comment": "Optional Phase 1 booking sequence (see src/config/bookingSequence.js): opted-in leads only, one scheduling link per message, day 0/1/3/7, stops on booked/reply/opt-out. Leave enabled false until the client approves the wording.",
+    "enabled": false,
+    "landingPageUrl": "",
+    "steps": [
+      { "day": 1, "channel": "Email" },
+      { "day": 3, "channel": "SMS" },
+      { "day": 7, "channel": "Email" }
+    ],
+    "optInTags": ["opt-in"],
+    "smsConsentTags": ["sms-opt-in"]
+  },
   "agents": {
     "leadQualifier": { "enabled": true },
     "followUp": { "enabled": true, "maxAttempts": 4, "cadenceDays": [1, 3, 7, 14] },
