@@ -145,6 +145,72 @@ sweep"** in the command center (or send that as `instruction` to
 `POST /command`) to trigger one pass immediately, regardless of whether
 `AUTO_FOLLOWUP` is on.
 
+## Phase 1: booking sequence (opt-in leads only)
+
+Turned on per client with `bookingSequence` in its brain file (on for Grove
+Financial Group; see `src/config/bookingSequence.js` for every setting).
+
+**Who gets it.** Only people who asked to hear from the business: a form,
+a referral, a RetireFlo survey, or a contact tagged `opt-in` (also
+`requested-info`, `referral`, `retireflo`, or an `opt_in = yes` field). A
+list import or an old CRM contact sent to the agent is assessed but **not
+contacted** - it gets a note and the `sales-agent-no-opt-in` tag. A `DND` /
+`do-not-contact` tag always wins.
+
+**What it sends.** Day 0: the first reply (email when there is an email).
+Day 1, 3, 7: follow-ups (email, text, email). Every message is short,
+personal (first name + what they asked about), and carries **one link** -
+the scheduling page (`landingPageUrl`, default `bookingLink`). Any link the
+AI writes is removed and the scheduling link is added in code. Texts only go
+to contacts with text consent (`sms-opt-in` tag or `sms_consent` field);
+otherwise that step goes by email. Texts end with "Reply STOP to opt out";
+emails get the sign-off, an unsubscribe line and the CAN-SPAM address. The
+usual compliance checks (investment topics, Medicare disclaimer, separation
+rules) still hold anything that trips them. Sends only inside `sendWindow`
+(GFG: 9 AM - 7 PM Central, Monday - Saturday).
+
+**When it stops.** The moment the person books (`/webhook/status?status=booked`),
+replies (`/webhook/reply` - from then on it's a conversation), or opts out
+(a STOP/unsubscribe reply or `/webhook/status?status=opted_out`). A held
+message or an error pauses that one lead and leaves a note on the contact.
+
+**Tracking.** Set `PUBLIC_BASE_URL` (e.g. your Railway URL, or better a
+custom domain like `go.grovefinancialgroupinc.com` pointed at Railway) and
+each link becomes `/go/<code>`: the click is counted, then the visitor goes
+to the scheduling page with UTM tags. Emails also carry a 1x1 open pixel
+(`/o/<code>.gif`; opens are approximate). Known email link scanners are not
+counted. Without `PUBLIC_BASE_URL`, links go straight to the page with UTM
+tags and only GHL/analytics see the clicks. Bookings are credited to the
+last message the person clicked (or the last one sent).
+
+**Cost per booked appointment.** Type `spent $250 on Facebook in November`
+in the command center (or `POST /api/spend { brand, month: "2026-11",
+source, amount }`). Leads whose source contains that name count toward it.
+Then type **`booking report`** (or `booking report October`) for the funnel:
+opted-in leads -> started -> sent -> opened -> clicked -> booked, results by
+step, and cost per lead / per booked appointment by source. In review mode
+the report counts drafts and says so.
+
+**GoHighLevel setup for Phase 1**
+1. Each opt-in form's workflow (Form Submitted): add tag `opt-in`; if the
+   form's SMS consent box is checked, add `sms-opt-in`; then add
+   `send-to-sales-agent` (the existing "Sales Agent - New Lead" workflow
+   takes it from there). Do the same for referral and RetireFlo entry points.
+2. Keep "Sales Agent - Reply" and "Sales Agent - Booked" published (they
+   stop the sequence).
+3. Add an opt-out workflow: trigger "Contact DND" (or tag `unsubscribed`) ->
+   Webhook `POST /webhook/status?status=opted_out&token=...`.
+4. Set `PUBLIC_BASE_URL` on Railway. Leave `GHL_SEND_MODE=review` until the
+   sequence wording is approved; `AUTO_FOLLOWUP=true` runs the day 1/3/7
+   steps (hourly by default).
+
+Leads that were in the system before Phase 1 have no sequence and are not
+followed up automatically on a client with the sequence on. Re-tag them
+`opt-in` + `send-to-sales-agent` if they asked to hear from you.
+
+Tests: `node test/bookingSequence.test.js` (no keys needed; starts the
+server on a spare port and drives the webhooks).
+
 ## Verified this session (DRY_RUN, no live keys)
 
 - `node test/simulate.js` ran the full pipeline - new lead -> GHL upsert ->
@@ -212,6 +278,7 @@ on `/health`, and auto-restart if the app crashes. In the Railway dashboard:
    - `SESSION_SECRET`, `AUTH_USERNAME`, `AUTH_PASSWORD_HASH`, `WEBHOOK_TOKEN`
    - `ANTHROPIC_API_KEY`, `GHL_API_KEY`, `GHL_LOCATION_ID`
    - `GHL_SEND_MODE=review` (drafts only) until you are ready to go live
+   - `PUBLIC_BASE_URL` (this app's public address) so booking-sequence links and opens are tracked
    - `AUTO_FOLLOWUP=false` until you are ready for the 24/7 scheduler
    - `RETIREMENT_WORKFLOW_APPROVED=false` until Gradient approves it
    - `MEDICARE_QUOTING_APPROVED=false` until compliance clears the Medicare quoting link

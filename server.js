@@ -16,6 +16,9 @@ const db = require('./src/store/db');
 const { startScheduler } = require('./src/scheduler/followUpScheduler');
 const { ensureCanSpamFooter, checkAdvisoryAutoSend, checkSeparation, financialGuardsOn } = require('./src/config/complianceGuard');
 const packages = require('./src/config/packages');
+const { ensureSignOff } = require('./src/config/signOff');
+const seq = require('./src/config/bookingSequence');
+const { sendSequenceTouch } = require('./src/agents/sequenceTouch');
 const {
   verifyCredentials,
   requireAuth,
@@ -137,6 +140,37 @@ app.get('/health', (req, res) => {
   });
 });
 
+// --- Booking-sequence tracking (public, no login) ------------------------
+// /go/<code>: counts the click on a sequence message's link, then forwards
+// to the scheduling page. /o/<code>.gif: a 1x1 image in sequence emails that
+// counts the open (approximate - some mail apps load images automatically,
+// some block them).
+const PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+const LINK_SCANNER = /bot|crawl|spider|preview|scanner|proofpoint|mimecast|barracuda|safelinks|urldefense|facebookexternalhit|slackbot|whatsapp|curl|wget|python-requests/i;
+
+app.get('/go/:code', (req, res) => {
+  const touch = db.getTouch(req.params.code);
+  if (!touch) {
+    let fallback = '/';
+    try { fallback = loadBrain().website || '/'; } catch { /* keep "/" */ }
+    return res.redirect(302, fallback);
+  }
+  // Email security scanners "click" links before people do; don't count them.
+  if (!LINK_SCANNER.test(req.get('user-agent') || '')) {
+    db.recordTouchEvent(touch.code, 'click');
+    db.logEvent({ leadId: touch.lead_id, agent: 'tracking', action: 'click', detail: { step: touch.step, channel: touch.channel }, dryRun: false });
+  }
+  res.redirect(302, touch.url);
+});
+
+app.get('/o/:file', (req, res) => {
+  const code = String(req.params.file).replace(/\.gif$/i, '');
+  const touch = db.getTouch(code);
+  if (touch && !LINK_SCANNER.test(req.get('user-agent') || '')) db.recordTouchEvent(code, 'open');
+  res.set({ 'Content-Type': 'image/gif', 'Cache-Control': 'no-store, no-cache, must-revalidate', Pragma: 'no-cache' });
+  res.send(PIXEL);
+});
+
 // --- Website form / generic lead webhook --------------------------------
 // Point your website form handler or GHL "Custom Webhook" workflow action
 // at POST /webhook/lead. Expects: { brand?, firstName, lastName, email,
@@ -163,6 +197,7 @@ const DEFAULT_TAGS = {
   opted_out: 'sales-agent-opted-out',
   booked: 'sales-agent-booked',
   won: 'sales-agent-won',
+  no_opt_in: 'sales-agent-no-opt-in',
 };
 const TAG_ALIASES = { qualified: 'good_fit', needs_human: 'needs_you', disqualified: 'not_a_fit' };
 
@@ -198,31 +233,6 @@ function checkOutbound(channel, text, brain) {
   const advisory = checkAdvisoryAutoSend(channel, text, brain);
   if (advisory.blocked) return advisory;
   return checkSeparation(text, brain);
-}
-
-/**
- * Makes sure an email ends with the approved sign-off (voice.signOffName,
- * e.g. "Leon Grove, ChFC®, RICP® - Grove Financial Group"). If the model
- * already signed with the full name and both designations, it's left alone.
- * A bare closing line like "Leon", "Leon Grove" or "Dr. Grove" is replaced
- * rather than doubled up. SMS is left as-is (length matters there).
- */
-function ensureSignOff(channel, messageText, brain) {
-  const text = (messageText || '').trimEnd();
-  const signOff = brain?.voice?.signOffName;
-  if (channel !== 'Email' || !signOff || !text) return text;
-
-  const [nameLine, ...rest] = signOff.split(' - ');
-  const plain = (s) => s.replace(/[®™]/g, '').replace(/\s+/g, ' ').toLowerCase();
-  if (plain(text).includes(plain(nameLine))) return text;
-
-  const lines = text.split('\n');
-  const last = (lines[lines.length - 1] || '').trim();
-  if (/^[-–—\s]*(leon(\s+grove)?|dr\.?\s*(leon\s+)?grove)[,.\s]*$/i.test(last)) lines.pop();
-  const body = lines.join('\n').trimEnd();
-  const block = [nameLine.trim(), rest.join(' - ').trim()].filter(Boolean).join('\n');
-  // Right under a closing like "Best," - otherwise a blank line first.
-  return /,\s*$/.test(body) ? `${body}\n${block}` : `${body}\n\n${block}`;
 }
 
 /** Sign-off first, then the CAN-SPAM address, so the address sits at the very end. */
@@ -275,6 +285,7 @@ function normalizeLead(body, brain) {
 app.post('/webhook/lead', checkToken, async (req, res) => {
   try {
     const brainForLead = loadBrain(normalizeLead(req.body).brand || req.query.brand);
+    const rawBody = req.body || {};
     req.body = { ...req.body, ...normalizeLead(req.body, brainForLead) };
     if (isDuplicateRun(req.body.ghlContactId)) {
       console.log(`Skipped duplicate webhook for contact ${req.body.ghlContactId}`);
@@ -311,6 +322,15 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
       postalCode: req.body.postalCode,
     });
 
+    // Phase 1 booking sequence: did this person ask to hear from us?
+    const seqCfg = seq.sequenceConfig(brain);
+    const optIn = seqCfg
+      ? seq.checkOptIn({ source: req.body.source, tags: seq.tagsFrom(rawBody), customData: rawBody.customData || rawBody.custom_data }, seqCfg)
+      : null;
+    if (seqCfg) {
+      db.updateLeadSequence(leadId, { optInVia: optIn.via, smsConsent: optIn.smsConsent, interest: req.body.message || null });
+    }
+
     // Push the lead into GHL right away (create/update contact) so it's
     // never siloed in this app's own database.
     // A lead sent BY GoHighLevel already exists there - use its contact id
@@ -346,6 +366,9 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
         message: req.body.message,
         context: req.body.context,
         ghlContactId,
+        writingNote: seqCfg && optIn.optedIn
+          ? `Write the reply as an ${seq.channelFor(seqCfg.firstTouchChannel, { email: req.body.email, phone: req.body.phone, sms_consent: optIn.smsConsent }) === 'SMS' ? 'SMS text (1-2 sentences)' : 'email (2-4 sentences)'}. Do not include any link, URL, sign-off or opt-out line - the scheduling link and sign-off are added automatically after your message.`
+          : null,
       },
     });
 
@@ -413,6 +436,43 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
           tagResult = { ...(tagResult || {}), triggerTagRemoveError: rmErr.message };
         }
       }
+    }
+
+    // Phase 1: no opt-in on file = nobody is contacted automatically.
+    if (seqCfg && !optIn.optedIn && ghlContactId) {
+      db.updateLeadSequence(leadId, { seqStatus: 'not_opted_in' });
+      db.logEvent({ leadId, agent: 'sequence', action: 'not_opted_in', detail: { source: req.body.source, blocked: optIn.blocked || null }, dryRun: false });
+      await ghl.addNote({
+        contactId: ghlContactId,
+        body: `SALES AGENT: not contacted - ${optIn.blocked || `no opt-in on file (source: ${req.body.source || 'unknown'})`}.\nThe booking sequence only goes to people who asked to hear from you (a form, a referral or RetireFlo). If this person did, add the "opt-in" tag and re-tag send-to-sales-agent.`,
+      }).catch((e) => console.error('Could not add opt-in note:', e.message));
+      await ghl.addTags({ contactId: ghlContactId, tags: [tagFor(brain, 'no_opt_in')] }).catch(() => {});
+      return res.json({ leadId, ghlResult, verdict, assessmentNote, tagResult, sendResult: { held: true, reason: 'no opt-in on file' } });
+    }
+
+    if (seqCfg && verdict.verdict === 'qualified' && verdict.reply && ghlContactId) {
+      const firstChannel = seq.channelFor(seqCfg.firstTouchChannel, { email: req.body.email, phone: req.body.phone, sms_consent: optIn.smsConsent });
+      if (!firstChannel) {
+        db.updateLeadStatus(leadId, 'needs_human');
+        db.updateLeadSequence(leadId, { seqStatus: 'held' });
+        await ghl.addNote({ contactId: ghlContactId, body: 'SALES AGENT: good fit, but there is no email and no text consent on file - booking sequence not started. Add one and re-tag send-to-sales-agent.' }).catch(() => {});
+        await ghl.addTags({ contactId: ghlContactId, tags: [tagFor(brain, 'needs_you')] }).catch(() => {});
+        return res.json({ leadId, ghlResult, verdict, assessmentNote, tagResult, sendResult: { held: true, reason: 'no email or text consent on file' } });
+      }
+      const touch = await sendSequenceTouch({
+        brain, cfg: seqCfg, lead: { id: leadId, ghlContactId }, step: 0, channel: firstChannel,
+        text: verdict.reply, subject: `Thanks for reaching out to ${brain.businessName}`,
+      });
+      if (touch.held) {
+        db.updateLeadStatus(leadId, 'needs_human');
+        db.updateLeadSequence(leadId, { seqStatus: 'held' });
+        db.logEvent({ leadId, agent: 'leadQualifier', action: 'blocked_compliance', detail: { reason: touch.reason }, dryRun: false });
+        await ghl.addNote({ contactId: ghlContactId, body: `SALES AGENT: first message held, not sent\nWhy: ${touch.reason}\n\n${touch.message}` }).catch(() => {});
+        return res.json({ leadId, ghlResult, verdict, assessmentNote, tagResult, sendResult: { held: true, reason: touch.reason } });
+      }
+      db.updateLeadSequence(leadId, { seqStatus: 'active', seqStep: 0, seqStartedAt: db.toDbTime(new Date()) });
+      db.logEvent({ leadId, agent: 'sequence', action: 'started', detail: { channel: firstChannel, optInVia: optIn.via, mode: touch.mode, link: touch.link }, dryRun: touch.mode === 'dry_run' });
+      return res.json({ leadId, ghlResult, verdict, assessmentNote, tagResult, sendResult: touch.sendResult, sequence: { started: true, channel: firstChannel, link: touch.link } });
     }
 
     let sendResult = null;
@@ -538,6 +598,13 @@ app.post('/webhook/reply', checkToken, async (req, res) => {
     if (REPLY_STATUS[result.intent]) db.updateLeadStatus(lead.id, REPLY_STATUS[result.intent]);
     else if (lead.status !== 'booked' && lead.status !== 'won') db.updateLeadStatus(lead.id, 'active');
 
+    // Any reply ends the timed booking sequence - from here it's a conversation.
+    const stoppedSequence = lead.seq_status === 'active';
+    if (stoppedSequence) {
+      db.updateLeadSequence(lead.id, { seqStatus: result.intent === 'opted_out' ? 'stopped_opted_out' : 'stopped_replied' });
+      db.logEvent({ leadId: lead.id, agent: 'sequence', action: result.intent === 'opted_out' ? 'stopped_opted_out' : 'stopped_replied', detail: { channel }, dryRun: false });
+    }
+
     const label = REPLY_LABELS[result.intent] || result.intent;
     await ghl.addNote({
       contactId: r.ghlContactId,
@@ -545,6 +612,7 @@ app.post('/webhook/reply', checkToken, async (req, res) => {
         `SALES AGENT - REPLY RECEIVED: ${label}`,
         `Their reply (${channel}): ${r.replyText || '(no text came through)'}`,
         result.reason ? `Why: ${result.reason}` : '',
+        stoppedSequence ? 'Booking sequence stopped - they replied.' : '',
         result.draftForDrGrove ? `\nDraft for you to review (NOT sent):\n${finalizeOutbound(channel, result.draftForDrGrove, brain)}` : '',
       ].filter(Boolean).join('\n'),
     }).catch((e) => console.error('Could not add reply note:', e.message));
@@ -685,6 +753,12 @@ app.post('/webhook/status', checkToken, async (req, res) => {
 
     db.updateLeadStatus(lead.id, status);
     db.logEvent({ leadId: lead.id, agent: 'statusSync', action: status, detail: { contactId }, dryRun: false });
+    // Booking sequence: stop it, and give the booking to the message that earned it.
+    if (lead.seq_status === 'active') db.updateLeadSequence(lead.id, { seqStatus: `stopped_${status}` });
+    if (status === 'booked') {
+      db.updateLeadSequence(lead.id, { bookedAt: db.toDbTime(new Date()) });
+      db.creditBooking(lead.id);
+    }
     await ghl.addTags({ contactId, tags: [tagFor(statusBrain, status)] }).catch((e) => console.error('Could not tag status:', e.message));
     await ghl.addNote({ contactId, body: `SALES AGENT: ${STATUS_SYNC[status].note}` }).catch((e) => console.error('Could not add status note:', e.message));
     res.json({ found: true, leadId: lead.id, status });
@@ -824,6 +898,23 @@ app.post('/api/package', requireAuth, (req, res) => {
     }
     db.logEvent({ agent: 'package', action: 'set', detail: { brand: brain.clientId, package: req.body.package }, dryRun: false });
     res.json({ brand: brain.clientId, package: packages.packageFor(brain) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Ad / lead spend for cost per booked appointment: { brand, month: "2026-11", source: "facebook", amount: 250 }
+app.post('/api/spend', requireAuth, (req, res) => {
+  try {
+    const brain = loadBrain(req.body.brand);
+    const month = String(req.body.month || '');
+    const amount = Number(req.body.amount);
+    const source = String(req.body.source || '').trim();
+    if (!/^20\d\d-(0[1-9]|1[0-2])$/.test(month) || !source || !(amount >= 0)) {
+      return res.status(400).json({ error: 'Send month as YYYY-MM, a source name, and an amount of 0 or more.' });
+    }
+    db.setSpend({ brand: brain.clientId, month, source, amount });
+    res.json({ ok: true, brand: brain.clientId, month, spend: db.spendFor(brain.clientId, month) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
