@@ -76,6 +76,50 @@ if (!leadColumns.includes('postal_code')) {
 if (!leadColumns.includes('is_test')) {
   db.exec(`ALTER TABLE leads ADD COLUMN is_test INTEGER DEFAULT 0`);
 }
+// Phase 1 booking sequence (opt-in leads only). seq_status is null until the
+// lead is checked for opt-in, then one of: active, not_opted_in, held,
+// paused_error, completed, stopped_replied, stopped_booked,
+// stopped_opted_out, stopped_won. seq_step = follow-up steps done so far.
+for (const [col, type] of [
+  ['interest', 'TEXT'], // what the lead said on the form - personalizes follow-ups
+  ['opt_in_via', 'TEXT'],
+  ['sms_consent', 'INTEGER DEFAULT 0'],
+  ['seq_status', 'TEXT'],
+  ['seq_step', 'INTEGER DEFAULT 0'],
+  ['seq_started_at', 'TEXT'],
+  ['booked_at', 'TEXT'],
+]) {
+  if (!leadColumns.includes(col)) db.exec(`ALTER TABLE leads ADD COLUMN ${col} ${type}`);
+}
+
+db.exec(`
+  -- One row per sequence message drafted or sent, with its tracking code.
+  CREATE TABLE IF NOT EXISTS touches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    lead_id INTEGER NOT NULL,
+    brand TEXT NOT NULL,
+    step INTEGER NOT NULL,
+    channel TEXT NOT NULL,
+    url TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    open_count INTEGER DEFAULT 0,
+    first_open_at TEXT,
+    click_count INTEGER DEFAULT 0,
+    first_click_at TEXT,
+    booked INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  -- Ad / lead spend per client, month (YYYY-MM) and source, for cost per booked appointment.
+  CREATE TABLE IF NOT EXISTS spend (
+    brand TEXT NOT NULL,
+    month TEXT NOT NULL,
+    source TEXT NOT NULL,
+    amount REAL NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (brand, month, source)
+  );
+`);
 
 function insertLead(lead) {
   const stmt = db.prepare(`
@@ -297,7 +341,83 @@ function pipelineStats(brand, days = 30) {
   };
 }
 
+// --- Phase 1 booking sequence ---------------------------------------------
+
+/** Set any of the sequence fields on a lead (only the keys given change). */
+function updateLeadSequence(leadId, fields) {
+  const map = { seqStatus: 'seq_status', seqStep: 'seq_step', seqStartedAt: 'seq_started_at', optInVia: 'opt_in_via', smsConsent: 'sms_consent', interest: 'interest', bookedAt: 'booked_at' };
+  const sets = []; const vals = [];
+  for (const [k, col] of Object.entries(map)) {
+    if (k in fields) { sets.push(`${col} = ?`); vals.push(typeof fields[k] === 'boolean' ? Number(fields[k]) : fields[k]); }
+  }
+  if (!sets.length) return 0;
+  return db.prepare(`UPDATE leads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, leadId).changes;
+}
+
+/** Leads with an active sequence for one client (test leads left out). */
+function activeSequenceLeads(brand) {
+  return db.prepare(`SELECT * FROM leads WHERE brand = ? AND seq_status = 'active' AND is_test = 0 ORDER BY id`).all(brand);
+}
+
+function insertTouch({ code, leadId, brand, step, channel, url, mode }) {
+  db.prepare(`INSERT INTO touches (code, lead_id, brand, step, channel, url, mode) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(code, leadId, brand, step, channel, url, mode);
+}
+
+function getTouch(code) {
+  return db.prepare(`SELECT * FROM touches WHERE code = ?`).get(code) || null;
+}
+
+/** Count an email open or a link click; returns the touch (null if the code is unknown). */
+function recordTouchEvent(code, kind) {
+  const t = getTouch(code);
+  if (!t) return null;
+  const now = toDbTime(new Date());
+  if (kind === 'open') {
+    db.prepare(`UPDATE touches SET open_count = open_count + 1, first_open_at = COALESCE(first_open_at, ?) WHERE id = ?`).run(now, t.id);
+  } else if (kind === 'click') {
+    // A click means the email was opened too, even when images were blocked.
+    db.prepare(`UPDATE touches SET click_count = click_count + 1, first_click_at = COALESCE(first_click_at, ?), first_open_at = COALESCE(first_open_at, ?) WHERE id = ?`).run(now, now, t.id);
+  }
+  return getTouch(code);
+}
+
+/**
+ * Give a booking to the message that earned it: the latest touch the lead
+ * clicked, otherwise the latest touch they were sent. Returns that touch.
+ */
+function creditBooking(leadId) {
+  // Every lead row for the same GHL contact counts (a contact re-sent to the
+  // agent gets a new row, but earlier messages still earned the booking).
+  const ids = `SELECT id FROM leads WHERE id = @leadId OR (ghl_contact_id IS NOT NULL AND ghl_contact_id = (SELECT ghl_contact_id FROM leads WHERE id = @leadId))`;
+  const t = db.prepare(`SELECT * FROM touches WHERE lead_id IN (${ids}) AND click_count > 0 ORDER BY id DESC LIMIT 1`).get({ leadId })
+    || db.prepare(`SELECT * FROM touches WHERE lead_id IN (${ids}) ORDER BY id DESC LIMIT 1`).get({ leadId });
+  if (!t) return null;
+  db.prepare(`UPDATE touches SET booked = 0 WHERE lead_id IN (${ids})`).run({ leadId });
+  db.prepare(`UPDATE touches SET booked = 1 WHERE id = ?`).run(t.id);
+  return t;
+}
+
+function setSpend({ brand, month, source, amount }) {
+  db.prepare(`
+    INSERT INTO spend (brand, month, source, amount, updated_at) VALUES (?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(brand, month, source) DO UPDATE SET amount = excluded.amount, updated_at = excluded.updated_at
+  `).run(brand, month, String(source).trim().toLowerCase(), Number(amount));
+}
+
+function spendFor(brand, month) {
+  return db.prepare(`SELECT source, amount FROM spend WHERE brand = ? AND month = ? ORDER BY source`).all(brand, month);
+}
+
 module.exports = {
+  updateLeadSequence,
+  activeSequenceLeads,
+  insertTouch,
+  getTouch,
+  recordTouchEvent,
+  creditBooking,
+  setSpend,
+  spendFor,
   setLeadTest,
   setLeadPostalCode,
   toDbTime,
