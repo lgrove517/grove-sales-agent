@@ -19,6 +19,7 @@ const packages = require('./src/config/packages');
 const { ensureSignOff } = require('./src/config/signOff');
 const seq = require('./src/config/bookingSequence');
 const { sendSequenceTouch } = require('./src/agents/sequenceTouch');
+const aiCaller = require('./src/agents/aiCallerAgent');
 const {
   verifyCredentials,
   requireAuth,
@@ -472,7 +473,14 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
       }
       db.updateLeadSequence(leadId, { seqStatus: 'active', seqStep: 0, seqStartedAt: db.toDbTime(new Date()) });
       db.logEvent({ leadId, agent: 'sequence', action: 'started', detail: { channel: firstChannel, optInVia: optIn.via, mode: touch.mode, link: touch.link }, dryRun: touch.mode === 'dry_run' });
-      return res.json({ leadId, ghlResult, verdict, assessmentNote, tagResult, sendResult: touch.sendResult, sequence: { started: true, channel: firstChannel, link: touch.link } });
+      // Phase 2: an AI call too, if they gave call consent (next allowed time in their time zone).
+      const call = packages.hasFeature(brain, 'leadAgent')
+        ? await aiCaller.scheduleFirstCall({
+          brain, leadId, ghlContactId, phone: req.body.phone, state: req.body.state, interest: req.body.message,
+          source: req.body.source, tags: seq.tagsFrom(rawBody), customData: rawBody.customData || rawBody.custom_data,
+        }).catch((e) => ({ scheduled: false, reason: e.message }))
+        : null;
+      return res.json({ leadId, ghlResult, verdict, assessmentNote, tagResult, sendResult: touch.sendResult, sequence: { started: true, channel: firstChannel, link: touch.link }, call });
     }
 
     let sendResult = null;
@@ -598,7 +606,9 @@ app.post('/webhook/reply', checkToken, async (req, res) => {
     if (REPLY_STATUS[result.intent]) db.updateLeadStatus(lead.id, REPLY_STATUS[result.intent]);
     else if (lead.status !== 'booked' && lead.status !== 'won') db.updateLeadStatus(lead.id, 'active');
 
-    // Any reply ends the timed booking sequence - from here it's a conversation.
+    // Any reply ends the timed booking sequence and cancels a scheduled AI
+    // call - from here it's a conversation.
+    aiCaller.cancelCall(lead, 'they replied');
     const stoppedSequence = lead.seq_status === 'active';
     if (stoppedSequence) {
       db.updateLeadSequence(lead.id, { seqStatus: result.intent === 'opted_out' ? 'stopped_opted_out' : 'stopped_replied' });
@@ -755,6 +765,7 @@ app.post('/webhook/status', checkToken, async (req, res) => {
     db.logEvent({ leadId: lead.id, agent: 'statusSync', action: status, detail: { contactId }, dryRun: false });
     // Booking sequence: stop it, and give the booking to the message that earned it.
     if (lead.seq_status === 'active') db.updateLeadSequence(lead.id, { seqStatus: `stopped_${status}` });
+    aiCaller.cancelCall(lead, status);
     if (status === 'booked') {
       db.updateLeadSequence(lead.id, { bookedAt: db.toDbTime(new Date()) });
       db.creditBooking(lead.id);
@@ -762,6 +773,39 @@ app.post('/webhook/status', checkToken, async (req, res) => {
     await ghl.addTags({ contactId, tags: [tagFor(statusBrain, status)] }).catch((e) => console.error('Could not tag status:', e.message));
     await ghl.addNote({ contactId, body: `SALES AGENT: ${STATUS_SYNC[status].note}` }).catch((e) => console.error('Could not add status note:', e.message));
     res.json({ found: true, leadId: lead.id, status });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- AI call result (Phase 2) ----------------------------------------------
+// A GHL workflow posts here when a Voice AI call ends: contact id plus
+// whatever GHL offers for the call (status/outcome, summary, transcript,
+// recording). The agent reads it for tone and intent, tags and notes the
+// contact, retries a no-answer once, and stops everything on an opt-out.
+app.post('/webhook/call', checkToken, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const cd = b.customData || b.custom_data || {};
+    const pick = (...vals) => vals.find((v) => v !== undefined && v !== null && String(v).trim() !== '');
+    const contactId = pick(cd.contactId, cd.contact_id, b.contactId, b.contact_id, b.contact && b.contact.id);
+    if (!contactId) return res.status(400).json({ error: 'no contact id in the call webhook' });
+    if (isDuplicateRun(`call:${contactId}:${pick(cd.call_id, b.call_id, cd.call_summary, cd.summary, '') || ''}`)) {
+      return res.json({ skipped: 'duplicate', contactId });
+    }
+    const brain = brainForContact(contactId, b.brand || req.query.brand);
+    const lead = db.findLeadByGhlContactId(contactId);
+    if (!lead) return res.json({ found: false, contactId, note: 'Not a contact the agent has worked - nothing to update.' });
+    const result = await aiCaller.handleCallResult({
+      brain,
+      lead,
+      callStatus: pick(cd.call_status, cd.call_outcome, cd.status, cd.outcome, b.call_status, b.status),
+      summary: pick(cd.call_summary, cd.summary, b.call_summary, b.summary),
+      transcript: pick(cd.call_transcript, cd.transcript, b.call_transcript, b.transcript),
+      recordingUrl: pick(cd.recording_url, cd.recording, b.recording_url),
+    });
+    res.json({ leadId: lead.id, outcome: result.outcome, intent: result.intent, tone: result.tone, tags: result.tags, retryAt: result.retryAt });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

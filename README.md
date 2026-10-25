@@ -211,6 +211,57 @@ followed up automatically on a client with the sequence on. Re-tag them
 Tests: `node test/bookingSequence.test.js` (no keys needed; starts the
 server on a spare port and drives the webhooks).
 
+## Phase 2: AI caller (consented form leads only)
+
+One short AI phone call to a new opted-in lead, to hear their tone and intent
+and offer a free conversation with Leon. Settings: `aiCaller` in the brain
+file (`src/config/aiCaller.js` lists every option); type **`show call
+script`** in the command center to review the script.
+
+**Who is called** - all must be true: the lead started the booking sequence
+(Phase 1 opt-in), has **documented call consent** (tag `ai-call-consent` or a
+`call_consent = yes` field - text/email opt-in alone is not enough), has a
+phone number, and is **not a Medicare lead** (Medicare calls are recorded and
+need the CMS disclaimer in the first minute, so Leon makes those).
+
+**When** - only 10 AM - 6 PM, Monday - Friday, in the **lead's own time
+zone** (from their state; unknown state = noon - 5 PM Central). A form filled
+at 2 AM is called at the next window. Small volume: 5 calls per 24 hours, 2
+tries per lead (a no-answer is retried once on another day), never for a lead
+more than 3 days old. A reply, booking or opt-out cancels a scheduled call.
+
+**Human review** - nothing dials until Leon has reviewed the script, pasted
+it into the GHL Voice AI agent, and set `AI_CALLER_APPROVED=true`. Even then,
+review mode only notes "AI CALL READY" on the contact; calls dial with
+`AI_CALLER_LIVE=true` (calls only, emails/texts stay drafts) or
+`GHL_SEND_MODE=live`.
+
+**After the call** - GHL posts the result to `/webhook/call`; the agent
+reads the summary/transcript, notes outcome, tone, timeline and next step on
+the contact, and tags it (`sales-agent-call-wants-to-book`,
+`-interested-later`, `-not-interested`, `-no-answer`...). "Stop calling me"
+stops all calls, texts and emails. A 401(k)/IRA/pension mention is tagged
+`gwm-investment-inquiry` for Leon. The booking report shows an AI calls
+section.
+
+**GoHighLevel setup for Phase 2**
+1. Complete Voice AI KYC (ID verification) and create an outbound Voice AI
+   agent. Paste the script's opening, questions, offer, closing and rules
+   into its instructions. Set voicemail to hang up (no voicemails in Phase 2).
+2. On each opt-in form, add a separate call-consent checkbox with GHL's
+   required AI-call consent wording. In the form workflow: if checked, add
+   tag `ai-call-consent`.
+3. New workflow "Sales Agent - AI Call": trigger Contact Tag Added
+   `sales-agent-ai-call` -> action **Voice AI Outbound Call** (the agent above)
+   -> Webhook `POST /webhook/call?token=...` with custom data `call_status`,
+   `call_summary`, `call_transcript`, `recording_url` (map the call fields
+   GHL offers) -> remove tag `sales-agent-ai-call`.
+4. Railway: `FOLLOWUP_SWEEP_INTERVAL_MINUTES=15` (calls go out within 15
+   minutes of their time), `AUTO_FOLLOWUP=true`, then `AI_CALLER_APPROVED=true`
+   after the script review, and `AI_CALLER_LIVE=true` when ready to dial.
+
+Tests: `node test/aiCaller.test.js`.
+
 ## Verified this session (DRY_RUN, no live keys)
 
 - `node test/simulate.js` ran the full pipeline - new lead -> GHL upsert ->
