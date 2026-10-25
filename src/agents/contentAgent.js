@@ -1,7 +1,7 @@
 const { askClaude } = require('../integrations/anthropic');
 const { brainToSystemPrompt } = require('../config/loadBrain');
 const db = require('../store/db');
-const { detectInvestmentTopic } = require('../config/complianceGuard');
+const { detectInvestmentTopic, ensureAnnuityDisclosure } = require('../config/complianceGuard');
 
 const ROLE_PROMPT = `
 You are the CONTENT DRAFTER agent. You turn a one-line instruction from the
@@ -55,6 +55,8 @@ async function draftContent({ brain, instruction }) {
   // quote marks, never \n, \" or leftover JSON brackets.
   parsed.drafts = (parsed.drafts || []).map(cleanDraftText).filter(Boolean);
   parsed.notes = cleanDraftText(parsed.notes || '');
+  // Posts or emails that compare annuities/IUL to CDs carry the disclosure.
+  parsed.drafts = parsed.drafts.map((d) => ensureAnnuityDisclosure(d, brain).messageText);
 
   parsed.figuresToVerify = findUnapprovedFigures(parsed.drafts || [], brain);
   // Investment topics are Grove Wealth Management material: flag any draft

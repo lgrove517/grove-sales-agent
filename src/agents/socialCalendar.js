@@ -1,6 +1,6 @@
 const { askClaude } = require('../integrations/anthropic');
 const { brainToSystemPrompt } = require('../config/loadBrain');
-const { detectInvestmentTopic, financialGuardsOn, checkSeparation, ensureMedicareDisclaimer, checkMedicareQuoteLink } = require('../config/complianceGuard');
+const { detectInvestmentTopic, financialGuardsOn, checkSeparation, ensureMedicareDisclaimer, checkMedicareQuoteLink, ensureAnnuityDisclosure } = require('../config/complianceGuard');
 const { findUnapprovedFigures } = require('./contentAgent');
 const db = require('../store/db');
 
@@ -118,6 +118,7 @@ async function buildSocialCalendar({ brain, instruction }) {
     const qlink = checkMedicareQuoteLink(content, { brain, leadText: null });
     if (qlink.hold) flags.push(qlink.reason);
     content = ensureMedicareDisclaimer(content, { brain, anyMedicareMention: true }).messageText;
+    content = ensureAnnuityDisclosure(content, brain).messageText;
     return {
       date: d.date,
       weekday: d.weekday,
