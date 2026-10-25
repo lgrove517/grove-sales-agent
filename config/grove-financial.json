@@ -185,7 +185,7 @@
       "Copy the link exactly as written, and send only one quoting link per message. The code adds the required CMS disclaimer whenever the link appears."
     ]
   },
-  "marketingApproach": "Sep 17 2026 direction from Dr. Grove, confirmed with Gradient Advisors: market from Grove Financial Group (the insurance entity) and lead with State Insurance law compliance, not the Investment Advisor Representative disclosure. The goal of any first-touch or marketing message is simply to get a prospect talking with Dr. Grove through Grove Financial Group - not to pitch a specific product line up front. Which specific offer fits (insurance, Medicare, CD alternative, business planning, or investment advisory) is discovered in that conversation, not decided by the agent beforehand. Practical effect: the leadQualifier and contentDrafter agents should keep first-touch messages general ('let's talk about your financial picture' / 'happy to see how Grove Financial Group can help'), not lead with 'Retirement Plan Review' or 'Investment Advisory' by name, unless the lead themselves already named that specific interest. Oct 2026 update from Dr. Grove: retirement messaging on the Grove Financial Group side leads with income questions, not investment products - see messagingThemes. 401(k)s, rollovers, pensions, IRAs, business retirement plans and fiduciary services belong to Grove Wealth Management (Gradient Advisors); a Grove Financial Group message never raises them. When a lead raises them, the agent does not answer - it routes the lead to Dr. Grove (enforced in code: complianceGuard.detectInvestmentTopic).",
+  "marketingApproach": "Sep 17 2026 direction from Dr. Grove, confirmed with Gradient Advisors: market from Grove Financial Group (the insurance entity) and lead with State Insurance law compliance, not the Investment Advisor Representative disclosure. The goal of any first-touch or marketing message is simply to get a prospect talking with Dr. Grove through Grove Financial Group - not to pitch a specific product line up front. Which specific offer fits (insurance, Medicare, Principal Protection Strategies, business planning, or investment advisory) is discovered in that conversation, not decided by the agent beforehand. Practical effect: the leadQualifier and contentDrafter agents should keep first-touch messages general ('let's talk about your financial picture' / 'happy to see how Grove Financial Group can help'), not lead with 'Retirement Plan Review' or 'Investment Advisory' by name, unless the lead themselves already named that specific interest. Oct 2026 update from Dr. Grove: retirement messaging on the Grove Financial Group side leads with income questions, not investment products - see messagingThemes. 401(k)s, rollovers, pensions, IRAs, business retirement plans and fiduciary services belong to Grove Wealth Management (Gradient Advisors); a Grove Financial Group message never raises them. When a lead raises them, the agent does not answer - it routes the lead to Dr. Grove (enforced in code: complianceGuard.detectInvestmentTopic).",
   "voice": {
     "tone": "Warm, credible, unhurried. Leads with expertise (ChFC, RICP, 29 years experience, Marine Corps veteran) without being salesy. Speaks to Gulf Coast individuals and business owners like a trusted advisor, not a call-center script. First-touch messages open a conversation about their financial picture broadly - they do not pitch a specific product (see marketingApproach).",
     "readingLevel": "8th-9th grade",
@@ -200,11 +200,15 @@
       "risk-free",
       "act now",
       "limited time offer",
-      "circle back"
+      "circle back",
+      "safe money",
+      "safe investment",
+      "no risk",
+      "CD alternative"
     ]
   },
   "idealCustomerProfile": {
-    "description": "Five priority segments, per the Sep 2026 market demographics research: (1) life insurance/Medicare prospects age 60-75 in the licensed states, especially FL, AZ, and SC; (2) certificate of deposit holders (conservative savers, skew 55+ and higher income) who may be better served by an annuity or IUL; (3) mass-affluent individuals, including those under 50, with $250k+ investable assets who are 'less advised' and open to a first relationship; (4) small profitable business owners in FL and NC especially, for buy-sell and key-person conversations (business retirement-plan questions route to Grove Wealth Management via Dr. Grove); (5) international English-speaking $250k+ prospects in Dubai/select European countries - lowest priority and relationship-only until carrier and licensing questions are resolved (see guardrails).",
+    "description": "Five priority segments, per the Sep 2026 market demographics research: (1) life insurance/Medicare prospects age 60-75 in the licensed states, especially FL, AZ, and SC; (2) certificate of deposit holders (conservative savers, skew 55+ and higher income) who may be better served by an annuity or IUL - offered as Principal Protection Strategies; (3) mass-affluent individuals, including those under 50, with $250k+ investable assets who are 'less advised' and open to a first relationship; (4) small profitable business owners in FL and NC especially, for buy-sell and key-person conversations (business retirement-plan questions route to Grove Wealth Management via Dr. Grove); (5) international English-speaking $250k+ prospects in Dubai/select European countries - lowest priority and relationship-only until carrier and licensing questions are resolved (see guardrails).",
     "goodFitSignals": [
       "Mentions retirement income, annuities, life insurance, IUL, or Medicare (if they mention a pension, 401(k), IRA or rollover, that is still a good fit - but route it to Dr. Grove for Grove Wealth Management, do not reply)",
       "Mentions holding CDs, or being a conservative/safety-focused saver looking for better tax or income treatment",
@@ -235,6 +239,11 @@
       "name": "Life Insurance / IUL / Annuities",
       "description": "Insurance-licensed guidance in AL, FL, SC, NC, and AZ only.",
       "cta": "Schedule a consultation"
+    },
+    {
+      "name": "Principal Protection Strategies",
+      "description": "Oct 25 2026, Dr. Grove: the name for what used to be called the CD alternative conversation - for CD holders and conservative savers who want their principal protected while looking at better growth, tax or income treatment through insurance products (fixed and fixed indexed annuities, IUL). Insurance-side, AL, FL, SC, NC and AZ only; not a Gradient/investment topic. Always call it Principal Protection Strategies. Never use the word 'safe' or 'safe money', never call an annuity a CD or a deposit, never imply it is FDIC-insured, and never quote rates or guarantees. Any message comparing it to CDs or bank savings carries the annuity disclosure (added automatically in code).",
+      "cta": "Schedule a Principal Protection Strategies conversation"
     },
     {
       "name": "Medicare Planning",
