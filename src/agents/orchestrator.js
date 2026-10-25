@@ -7,6 +7,7 @@ const { buildBriefing, recommend } = require('./briefing');
 const { buildSocialCalendar } = require('./socialCalendar');
 const { buildMonthlyReport } = require('./monthlyReport');
 const { buildBookingReport, parseSpend } = require('./bookingReport');
+const { renderScript, callerConfig } = require('../config/aiCaller');
 const { hasFeature, lockedMessage } = require('../config/packages');
 const { brainToSystemPrompt } = require('../config/loadBrain');
 const db = require('../store/db');
@@ -51,6 +52,8 @@ one of these intents and extract any parameters mentioned:
   "cost per appointment", "how is the booking sequence doing?"
 - "set_spend": they are telling you how much they spent on ads or leads
   from a source, e.g. "spent $250 on Facebook in November"
+- "call_script": they want to see or review the AI phone call script,
+  e.g. "show call script", "review the AI caller script"
 - "ask": a question or comment for the assistant itself rather than a task,
   e.g. "why isn't Arizona listed?", "which states am I licensed in?", "what
   does the agent do when someone asks about a 401(k)?", "is this compliant?"
@@ -58,7 +61,7 @@ one of these intents and extract any parameters mentioned:
 
 Output STRICT JSON only:
 {
-  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "booking_report" | "set_spend" | "ask" | "unknown",
+  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "booking_report" | "set_spend" | "call_script" | "ask" | "unknown",
   "leadName": "name mentioned, if any, else empty string",
   "cleanedInstruction": "the instruction, lightly cleaned up, to hand to the specialist agent"
 }
@@ -70,6 +73,9 @@ function ruleBasedRoute(instruction) {
   const lower = instruction.toLowerCase();
   if (/\b(spent|ad spend|ad budget|spend)\b/.test(lower) && /\d/.test(lower) && !/\breport\b/.test(lower)) {
     return { intent: 'set_spend', leadName: '', cleanedInstruction: instruction };
+  }
+  if (/\b(call|caller|calling|phone) script\b/.test(lower)) {
+    return { intent: 'call_script', leadName: '', cleanedInstruction: instruction };
   }
   if (/(booking (report|results|numbers|sequence)|cost per (booked )?(appointment|booking)|sequence (report|results)|truth dashboard)/.test(lower)) {
     return { intent: 'booking_report', leadName: '', cleanedInstruction: instruction };
@@ -142,6 +148,21 @@ async function runCommand({ brain, instruction, since }) {
   }
 
   switch (routed.intent) {
+    case 'call_script': {
+      const cfg = callerConfig(brain, { ignoreApproval: true });
+      if (!cfg || !brain.aiCaller.script) {
+        response = { message: `The AI caller is not set up for ${brain.businessName}.` };
+      } else {
+        response = {
+          format: 'other',
+          drafts: [renderScript(brain, { firstName: '{first name}', interest: '{what they asked about}' })],
+          notes: cfg.approved
+            ? `Approved and live (${cfg.approvalFlag}=true). Paste any changes into the GHL Voice AI agent too.`
+            : `Not live yet. Review this script, paste it into the GHL Voice AI agent, then set ${cfg.approvalFlag}=true on Railway. Calls: ${cfg.callWindow.startHour}:00-${cfg.callWindow.endHour}:00 their time, up to ${cfg.dailyCap} per day, ${cfg.maxAttempts} tries per lead, consented form leads only, no Medicare leads.`,
+        };
+      }
+      break;
+    }
     case 'booking_report': {
       response = buildBookingReport({ brain, instruction });
       break;

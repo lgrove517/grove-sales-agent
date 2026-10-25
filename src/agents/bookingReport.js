@@ -81,6 +81,27 @@ function buildBookingReport({ brain, instruction, now = new Date() }) {
   });
   const allBooked = monthLeads.filter((l) => l.booked_at).length;
 
+  // AI calls this month (Phase 2).
+  const callEv = Object.fromEntries(all(`
+    SELECT e.action k, COUNT(*) n FROM events e JOIN leads l ON l.id = e.lead_id
+    WHERE l.brand = ? AND e.agent = 'aiCaller' AND e.created_at >= ? AND e.created_at < ? AND l.is_test = 0 GROUP BY e.action`, brand, start, end).map((x) => [x.k, x.n]));
+  const callIntents = Object.fromEntries(all(`
+    SELECT json_extract(e.detail, '$.intent') k, COUNT(*) n FROM events e JOIN leads l ON l.id = e.lead_id
+    WHERE l.brand = ? AND e.agent = 'aiCaller' AND e.action = 'result_conversation' AND e.created_at >= ? AND e.created_at < ? AND l.is_test = 0 GROUP BY k`, brand, start, end).map((x) => [x.k, x.n]));
+  const calledBooked = one(`SELECT COUNT(*) n FROM leads WHERE brand = ? AND booked_at >= ? AND booked_at < ? AND call_status IN ('completed') AND is_test = 0`, brand, start, end).n;
+  const callsMade = (callEv.placed || 0) + (callEv.review_ready || 0);
+  const callRows = callsMade || callEv.scheduled ? [
+    ['Calls scheduled', callEv.scheduled || 0],
+    [callEv.placed ? 'Calls placed' : 'Calls ready (review mode, not dialed)', callsMade],
+    ['  answered - conversation', callEv.result_conversation || 0],
+    ['    wants to book / booked on call', (callIntents.wants_to_book || 0) + (callIntents.booked_on_call || 0)],
+    ['    interested later', callIntents.interested_later || 0],
+    ['    not interested', callIntents.not_interested || 0],
+    ['  no answer / voicemail', (callEv.result_no_answer || 0) + (callEv.result_voicemail || 0)],
+    ['  asked not to be called', callEv.result_opted_out || 0],
+    ['Booked after a call conversation', calledBooked],
+  ] : [];
+
   const reviewNote = !sent.length && drafted.length;
   const sections = [
     { title: 'Leads', rows: [
@@ -106,6 +127,7 @@ function buildBookingReport({ brain, instruction, now = new Date() }) {
       ['  still in the sequence', byStatus('active')],
       ['  finished, no booking yet', cohort.filter((l) => l.seq_status === 'completed' && !l.booked_at).length],
     ] },
+    { title: 'AI calls', rows: callRows },
     { title: 'Cost', rows: spend.length
       ? [['Spend entered', money(totalSpend)], ...costRows, ['Cost per booked appointment (all sources)', allBooked ? money(totalSpend / allBooked) : 'no bookings yet']]
       : [['No spend entered for this month', 'type: spent $250 on Facebook in ' + MONTHS[month]]] },
