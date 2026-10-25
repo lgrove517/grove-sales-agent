@@ -9,14 +9,12 @@
   "bookingLink": "https://api.leadconnectorhq.com/widget/bookings/1-1-ai-consultation-calendar",
 
   "_todo": [
-    "mailingAddress.value: postal address for email footers (CAN-SPAM)",
-    "WEBTECH_GHL_API_KEY and WEBTECH_GHL_LOCATION_ID on Railway",
     "_pricingReference: CPA/tax and medical/dental pricing"
   ],
 
   "mailingAddress": {
-    "value": "",
-    "status": "NEEDED before any marketing email goes out: CAN-SPAM requires a valid physical postal address on commercial email. A P.O. box or registered business address works if Dr. Grove prefers not to use a home address."
+    "value": "Webtech Design LLC, PO Box 180124, Mobile, AL 36618",
+    "status": "Set Oct 25 2026 by Dr. Grove (PO Box) - appended to every Webtech marketing email for CAN-SPAM."
   },
 
   "ghl": {
