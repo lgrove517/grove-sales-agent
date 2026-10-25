@@ -318,7 +318,7 @@ with one stays off - the agents never see it - until that environment
 variable is set to `true`. To turn the Retirement Income Conversation on
 after Gradient approves it: Railway > Variables >
 `RETIREMENT_WORKFLOW_APPROVED=true`. Railway restarts the service and it is
-live; no code change needed. Use the same pattern for the Medicare, LTC, CD
+live; no code change needed. Use the same pattern for the Medicare, LTC, Principal Protection Strategies (formerly "CD")
 and IUL workflows when they are added.
 
 **Medicare quoting link** (`medicareQuoting` in `grove-financial.json`,
