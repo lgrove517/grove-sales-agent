@@ -11,7 +11,7 @@
     "partnersPage: confirm the URL once the Referral Partners page is published in WordPress."
   ],
   "mailingAddress": {
-    "value": "Grove Financial Group Inc., Mobile, AL 36618",
+    "value": "Grove Financial Group Inc., PO Box 180124, Mobile, AL 36618",
     "status": "Same interim value as grove-financial.json (city/state/zip only)."
   },
   "compliance": {

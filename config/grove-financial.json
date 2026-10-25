@@ -1,5 +1,5 @@
 {
-  "_comment": "Working example brain for Grove Financial Group Inc. - demonstrates the system with a real client. Still needs a CAN-SPAM-compliant mailing address for email footers before this goes live (Dr. Grove's home address is intentionally kept private).",
+  "_comment": "Working example brain for Grove Financial Group Inc. - demonstrates the system with a real client. CAN-SPAM mailing address: PO Box set Oct 25 2026.",
   "clientId": "grove-financial",
   "businessName": "Grove Financial Group Inc.",
   "industry": "Financial services - retirement planning, insurance, investment advisory",
@@ -7,8 +7,8 @@
   "phone": "(251) 206-7074",
   "bookingLink": "https://api.leadconnectorhq.com/widget/bookings/compliementary-financial-planning",
   "mailingAddress": {
-    "value": "Grove Financial Group Inc., Mobile, AL 36618",
-    "status": "INTERIM. Dr. Grove provided city/state/zip only (Sep 18 2026) as a placeholder that keeps his home street address off outbound email, per his standing preference. CAN-SPAM's 'valid physical postal address' requirement is generally read to need a street address, a USPS-registered PO Box, or a registered private mailbox - city+state+zip alone is a reasonable interim placeholder but likely does not fully satisfy that requirement on its own. If Dr. Grove wants to keep his home address private long-term, a PO Box would resolve this cleanly. Until then, this is the best available value and is better than omitting a mailing address entirely."
+    "value": "Grove Financial Group Inc., PO Box 180124, Mobile, AL 36618",
+    "status": "Set Oct 25 2026 by Dr. Grove (PO Box, shared with Webtech Design) - replaces the interim city/state/zip placeholder; appended to every GFG marketing email for CAN-SPAM and keeps his home address private."
   },
   "medicareDisclaimer": {
     "_comment": "CMS TPMO disclaimer with exact counts, by county (updated Oct 14 2026, Dr. Grove). Counts = Medicare Advantage (incl. special needs plans) and stand-alone Part D plans for plan year 2027 from the 6 organizations Dr. Grove is appointed and ready to sell with in Alabama: Aetna/CVS (incl. SilverScript), Humana, UnitedHealthcare, Devoted Health, HealthSpring, and Wellcare (Part D only in Alabama - no MA/MAPD there; added Oct 14 2026). BCBS not offered. Mobile: 68 MA/SNP (Humana 18, UHC 16, Devoted 18, Aetna 9, HealthSpring 7) + 9 PDP (Humana 3, UHC 2, SilverScript 1, HealthSpring 1, Wellcare 2) = 77. Baldwin: 65 MA/SNP (Humana 19, UHC 16, Devoted 18, Aetna 5, HealthSpring 7) + same 9 PDP = 74. Source: CMS 2027 landscape files via plainmedicare.com (county pages 01097, 01003; part-d/plans). Re-check every year before Oct 15. A lead whose ZIP is not in a listed area is NOT given Medicare plan details automatically - the draft is held for Dr. Grove (enforced in complianceGuard.ensureMedicareDisclaimer). To add an area, add an entry with its ZIPs and counts.",
