@@ -10,7 +10,8 @@
  * explicit opt-in rather than always-on.
  */
 const { loadBrain } = require('../config/loadBrain');
-const { draftFollowUp } = require('../agents/followUp');
+const { draftFollowUp, draftSequenceFollowUp } = require('../agents/followUp');
+const seq = require('../config/bookingSequence');
 const ghl = require('../integrations/ghl');
 const db = require('../store/db');
 const { hasFeature, lockedMessage } = require('../config/packages');
@@ -71,13 +72,13 @@ function findDueLeads(brand, cadenceDays, maxAttempts) {
  * advances each lead's attempt counter/next-due-date. Safe to call by hand
  * (e.g. from the command center: "run follow-up sweep") or on a timer.
  */
-async function runFollowUpSweep({ brand } = {}) {
+async function runFollowUpSweep({ brand, now } = {}) {
   const brain = loadBrain(brand);
   // Every GoHighLevel call in this sweep uses THIS client's account.
-  return ghl.runWithBrain(brain, () => sweepForBrain(brain));
+  return ghl.runWithBrain(brain, () => sweepForBrain(brain, { now }));
 }
 
-async function sweepForBrain(brain) {
+async function sweepForBrain(brain, { now = new Date() } = {}) {
   const followUpCfg = brain.agents?.followUp || {};
 
   if (!followUpCfg.enabled) {
@@ -86,6 +87,11 @@ async function sweepForBrain(brain) {
   if (!hasFeature(brain, 'aiFollowUp')) {
     return { ran: false, reason: lockedMessage(brain, 'aiFollowUp'), brand: brain.clientId, processed: [] };
   }
+
+  // Phase 1: a client with the booking sequence on follows up ONLY with
+  // opted-in leads in an active sequence, on the sequence's day 1/3/7 steps.
+  const cfg = seq.sequenceConfig(brain);
+  if (cfg) return sequenceSweep(brain, cfg, now);
 
   const cadenceDays = followUpCfg.cadenceDays?.length ? followUpCfg.cadenceDays : [1, 3, 7, 14];
   const maxAttempts = followUpCfg.maxAttempts || cadenceDays.length;
@@ -140,6 +146,66 @@ async function sweepForBrain(brain) {
   });
 
   return { ran: true, brand: brain.clientId, dueCount: due.length, processed };
+}
+
+/**
+ * Booking-sequence sweep: every lead whose next step is due gets that step,
+ * within the client's send window (no texts at night). Each lead is re-read
+ * right before sending, so a booking, reply or opt-out that came in during
+ * the sweep stops it.
+ */
+async function sequenceSweep(brain, cfg, now) {
+  if (!seq.inSendWindow(cfg, now)) {
+    return { ran: false, sequence: true, brand: brain.clientId, reason: 'Outside the send window - due messages wait for the next sweep in sending hours.', processed: [] };
+  }
+  const due = db.activeSequenceLeads(brain.clientId).filter((row) => {
+    const at = seq.nextDueAt(cfg, row);
+    return at && at.getTime() <= now.getTime();
+  });
+  const processed = [];
+
+  for (const stale of due) {
+    const row = db.getLead(stale.id);
+    if (!row || row.seq_status !== 'active' || TERMINAL_STATUSES.includes(row.status)) continue;
+    const stepIndex = row.seq_step || 0;
+    const lead = { ...shapeLead(row), source: row.source, interest: row.interest, sms_consent: row.sms_consent };
+    const channel = seq.channelFor(cfg.steps[stepIndex].channel, row);
+    if (!channel) {
+      db.updateLeadSequence(row.id, { seqStatus: 'held' });
+      await noteAndTag(brain, lead, 'SALES AGENT: booking sequence paused - no email, and no text consent on file. Add one and re-tag send-to-sales-agent.');
+      processed.push({ leadId: row.id, held: 'no usable channel' });
+      continue;
+    }
+    try {
+      const out = await draftSequenceFollowUp({ brain, cfg, lead, stepIndex, channel });
+      if (out.sent) {
+        const done = stepIndex + 1 >= cfg.steps.length;
+        db.updateLeadSequence(row.id, { seqStep: stepIndex + 1, ...(done ? { seqStatus: 'completed' } : {}) });
+        db.recordFollowUpAttempt(row.id, stepIndex + 1, null);
+      } else {
+        db.updateLeadSequence(row.id, { seqStatus: 'held' });
+        await noteAndTag(brain, lead, `SALES AGENT: booking sequence step ${stepIndex + 1} held, not sent\nWhy: ${out.reason || 'not given'}${out.message ? `\n\n${out.message}` : ''}`);
+      }
+      processed.push({ leadId: row.id, step: stepIndex + 1, channel, sent: out.sent, mode: out.mode, reason: out.reason });
+    } catch (err) {
+      // One failure pauses this lead (instead of retrying every hour) and
+      // tells Dr. Grove on the contact.
+      db.updateLeadSequence(row.id, { seqStatus: 'paused_error' });
+      db.logEvent({ leadId: row.id, agent: 'scheduler', action: 'sequence_error', detail: { error: err.message }, dryRun: false });
+      await noteAndTag(brain, lead, `SALES AGENT: booking sequence paused after an error: ${err.message}`);
+      processed.push({ leadId: row.id, step: stepIndex + 1, error: err.message });
+    }
+  }
+
+  db.logEvent({ agent: 'scheduler', action: 'sequence_sweep_completed', detail: { brand: brain.clientId, dueCount: due.length }, dryRun: false });
+  return { ran: true, sequence: true, brand: brain.clientId, dueCount: due.length, processed };
+}
+
+async function noteAndTag(brain, lead, body) {
+  if (!lead.ghlContactId) return;
+  await ghl.addNote({ contactId: lead.ghlContactId, body }).catch((e) => console.error('Could not add sequence note:', e.message));
+  const tag = (brain.agentTags && (brain.agentTags.needs_you || brain.agentTags.needs_human)) || 'sales-agent-needs-you';
+  await ghl.addTags({ contactId: lead.ghlContactId, tags: [tag] }).catch(() => {});
 }
 
 let intervalHandle = null;
