@@ -32,6 +32,11 @@ async function sendSequenceTouch({ brain, cfg, lead, step, channel, text, subjec
   const { link, destination, tracked } = seq.linkFor(cfg, { step, channel, code });
   const message = finishText({ brain, cfg, channel, text, link });
 
+  // CAN-SPAM: a marketing email needs a postal address. With none on file
+  // the email is held for the owner instead of going out without one.
+  if (channel === 'Email' && !(brain.mailingAddress && String(brain.mailingAddress.value || '').trim())) {
+    return { sent: false, held: true, reason: 'No mailing address on file for email footers (CAN-SPAM). Add mailingAddress.value to this client\'s settings, then re-tag send-to-sales-agent.', message, code, link };
+  }
   const advisory = checkAdvisoryAutoSend(channel, message, brain);
   const check = advisory.blocked ? advisory : checkSeparation(message, brain);
   if (check.blocked) {
