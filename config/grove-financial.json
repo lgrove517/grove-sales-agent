@@ -370,6 +370,55 @@
     "sendWindow": { "timezone": "America/Chicago", "startHour": 9, "endHour": 19, "days": [1, 2, 3, 4, 5, 6] },
     "utm": { "source": "sales-agent", "campaign": "gfg-booking-sequence" }
   },
+  "aiCaller": {
+    "_comment": "Phase 2 (Oct 25 2026, Dr. Grove): one short AI phone call to new opted-in leads with DOCUMENTED CALL CONSENT (form checkbox -> tag ai-call-consent), to hear their tone and intent and offer a free conversation with Leon. Calls only 10 AM - 6 PM Monday - Friday in the lead's own time zone (a 2 AM form is called at the next window). Small volume to start: 5 calls per 24 hours, 2 tries per lead, leads no older than 3 days. Medicare leads are NOT called by the AI - Leon calls them (CMS recording and first-minute disclaimer rules). Stays OFF until Dr. Grove has reviewed this script, pasted it into the GHL Voice AI agent, and set AI_CALLER_APPROVED=true on Railway. Type 'show call script' in the command center to review it. No voicemail in Phase 2 - set the GHL agent to hang up on voicemail.",
+    "enabled": true,
+    "approvalFlag": "AI_CALLER_APPROVED",
+    "consentTags": [
+      "ai-call-consent",
+      "call-opt-in"
+    ],
+    "callWindow": {
+      "startHour": 10,
+      "endHour": 18,
+      "days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "dailyCap": 5,
+    "maxAttempts": 2,
+    "maxLeadAgeDays": 3,
+    "excludeMedicare": true,
+    "triggerTag": "sales-agent-ai-call",
+    "script": {
+      "version": "1 - draft for Dr. Grove's review, Oct 25 2026",
+      "opening": "Hi, is this {firstName}? ... Hi {firstName}, this is an AI assistant calling on behalf of Leon Grove at {businessName} in Mobile, Alabama. Our number is {phone}. You recently asked us for information about {interest}, and I'm just following up. This call may be recorded, and if you'd rather not get calls from us, just say \"stop\" at any time. Do you have two minutes for a couple of quick questions?",
+      "notGoodTime": "No problem at all. Is there a better day or time? ... Thank you - we'll also send you a link so you can pick a time that suits you. Have a great day.",
+      "questions": [
+        "What got you thinking about {interest} right now?",
+        "Is this something you'd like to look at soon, or more for down the road?",
+        "Is there anything specific you'd want Leon to help you with or answer?"
+      ],
+      "offer": "Leon offers a free, no-obligation conversation - about 15 to 20 minutes, by phone or Zoom - to talk through your situation and answer your questions. Would you like me to find a time for you with Leon?",
+      "closing": "Thank you, {firstName}. Leon looks forward to talking with you. If anything comes up before then, you can reach us at {phone}. Have a great day.",
+      "rules": [
+        "Always say you are an AI assistant. If asked whether you are a real person, say no - you are an AI assistant for Leon Grove.",
+        "If they say stop, don't call, or remove me: say \"Understood, we won't call you again,\" and end the call.",
+        "Never give advice, rates, quotes, product recommendations, guarantees or tax or legal information. Say: \"That's a great question for Leon - he'll go over it with you.\"",
+        "Never discuss specific Medicare plans or carriers. Say Leon will cover Medicare personally.",
+        "Never discuss 401(k)s, IRAs, pensions, rollovers, stocks or other investments. Say Leon will follow up on that personally.",
+        "Never use the words \"safe,\" \"risk-free\" or \"guaranteed.\" When CDs come up, call it Principal Protection Strategies and let Leon explain.",
+        "Use the title and designations exactly as Leon Grove, ChFC, RICP - never \"Doctor.\"",
+        "Keep the call under three minutes. Be warm, unhurried and polite; never pressure.",
+        "If the person is upset or confused, apologize, offer to have Leon call personally, and end the call."
+      ],
+      "voicemail": "Do not leave a voicemail in Phase 2 - hang up and the agent will try once more on another day."
+    }
+  },
   "agents": {
     "leadQualifier": {
       "enabled": true
