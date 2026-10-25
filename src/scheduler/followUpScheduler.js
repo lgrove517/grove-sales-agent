@@ -12,6 +12,7 @@
 const { loadBrain } = require('../config/loadBrain');
 const { draftFollowUp, draftSequenceFollowUp } = require('../agents/followUp');
 const seq = require('../config/bookingSequence');
+const { callSweep } = require('../agents/aiCallerAgent');
 const ghl = require('../integrations/ghl');
 const db = require('../store/db');
 const { hasFeature, lockedMessage } = require('../config/packages');
@@ -90,8 +91,11 @@ async function sweepForBrain(brain, { now = new Date() } = {}) {
 
   // Phase 1: a client with the booking sequence on follows up ONLY with
   // opted-in leads in an active sequence, on the sequence's day 1/3/7 steps.
+  // Phase 2: due AI calls first (each in the lead's own calling window).
+  const calls = hasFeature(brain, 'leadAgent') ? await callSweep(brain, now) : null;
+
   const cfg = seq.sequenceConfig(brain);
-  if (cfg) return sequenceSweep(brain, cfg, now);
+  if (cfg) return { ...(await sequenceSweep(brain, cfg, now)), calls };
 
   const cadenceDays = followUpCfg.cadenceDays?.length ? followUpCfg.cadenceDays : [1, 3, 7, 14];
   const maxAttempts = followUpCfg.maxAttempts || cadenceDays.length;
@@ -145,7 +149,7 @@ async function sweepForBrain(brain, { now = new Date() } = {}) {
     dryRun: false,
   });
 
-  return { ran: true, brand: brain.clientId, dueCount: due.length, processed };
+  return { ran: true, brand: brain.clientId, dueCount: due.length, processed, calls };
 }
 
 /**
