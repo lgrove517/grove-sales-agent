@@ -1,0 +1,110 @@
+{
+  "_comment": "DEMO BRAIN - a made-up real estate team used ONLY for Webtech Design sales demos. Nothing here is a real business, person or result. It has no GoHighLevel credentials on purpose (see 'ghl'), so it always runs in DRY_RUN: the agent assesses, tags and drafts live on screen, but nothing is ever sent and no real contact is touched. Sample leads are loaded automatically the first time the server starts, and the 'Reset demo' button on the dashboard puts them back.",
+
+  "demo": true,
+  "clientId": "demo-realty",
+  "businessName": "Magnolia Key Realty (Demo)",
+  "industry": "Residential real estate team",
+  "website": "https://example.com/magnolia-key-realty",
+  "phone": "(251) 555-0142",
+  "bookingLink": "https://example.com/magnolia-key-realty/book",
+
+  "package": "premium",
+  "billingEmail": "",
+
+  "ghl": {
+    "apiKeyEnv": "DEMO_GHL_API_KEY",
+    "locationIdEnv": "DEMO_GHL_LOCATION_ID",
+    "_note": "Leave both variables UNSET on the host. With no credentials this demo runs in DRY_RUN and can never fall back to Grove Financial Group's or Webtech's GoHighLevel account."
+  },
+
+  "compliance": {
+    "financialAdvisoryGuards": false,
+    "_note": "Real estate demo: no Gradient / investment-advisory guards."
+  },
+
+  "marketingApproach": "Magnolia Key Realty is a three-agent residential team. The goal of every conversation is a short call or a showing with an agent - never a hard sell. Buyers: find out their timeline, area and whether they are pre-approved; if not, offer to connect them with a lender of their choice. Sellers: offer a free home value review. Respond fast - speed to lead wins listings. All advertising and messaging follows Fair Housing rules.",
+
+  "voice": {
+    "tone": "Friendly, local and quick to help. Short sentences. Sound like a real agent texting back between showings, not a brochure.",
+    "readingLevel": "8th grade",
+    "signOffName": "Jordan Ellis, Magnolia Key Realty",
+    "bannedPhrases": ["dream home awaits", "act now", "won't last", "hot market", "guaranteed sale", "unlock your potential"]
+  },
+
+  "idealCustomerProfile": {
+    "description": "Home buyers and sellers in Mobile and Baldwin County, Alabama, moving in the next 1-6 months.",
+    "goodFitSignals": [
+      "Gives a timeline of 6 months or less",
+      "Names a neighborhood, city or price range in the service area",
+      "Already pre-approved, or asks about getting pre-approved",
+      "Owns a home in the area and asks what it is worth",
+      "Relocating for a job with a start date"
+    ],
+    "disqualifyingSignals": [
+      "Explicitly says they are not interested",
+      "Asks to be removed / opts out",
+      "Looking only outside Mobile and Baldwin County",
+      "Is another agent or a vendor selling services to the team"
+    ]
+  },
+
+  "offers": [
+    {
+      "name": "Buyer Consultation",
+      "description": "A 20-minute call with an agent to talk through timeline, budget, neighborhoods and next steps, followed by a custom home search.",
+      "cta": "Book a quick call with an agent"
+    },
+    {
+      "name": "Free Home Value Review",
+      "description": "For owners thinking about selling: an agent reviews recent nearby sales and gives a realistic price range, with no obligation to list.",
+      "cta": "Get your free home value review"
+    },
+    {
+      "name": "Showing Request",
+      "description": "Schedule a private showing of a specific listing.",
+      "cta": "Pick a time to see the home"
+    }
+  ],
+
+  "valueProps": [
+    "Replies within minutes, 7 days a week",
+    "Local agents who live in Mobile and Baldwin County",
+    "Clear next steps - no pressure, no spam"
+  ],
+
+  "objectionHandling": {
+    "\"I'm just looking\"": "That's fine - offer to set up a saved search so they see new listings first, and ask what area they like.",
+    "\"I already have an agent\"": "Respect it fully; do not try to take the client. Wish them well and stop.",
+    "\"I need to sell before I can buy\"": "Normal - offer the free home value review so they know what they can afford.",
+    "\"Rates are too high\"": "Don't give rate predictions. Offer to connect them with a lender of their choice for real numbers."
+  },
+
+  "guardrails": {
+    "neverSay": [
+      "Anything about the race, color, religion, sex, disability, familial status or national origin of a neighborhood or its residents (Fair Housing Act)",
+      "Whether a neighborhood is 'safe', 'family-friendly', 'exclusive' or describe who lives there - point to public resources instead",
+      "School ratings or opinions on school quality - point to the school district's own website",
+      "Mortgage rates, loan approval or what someone qualifies for - that comes from a lender",
+      "A guaranteed sale price, sale time or offer outcome",
+      "Legal or tax advice"
+    ],
+    "escalateToHumanIf": [
+      "Lead wants to make an offer, negotiate price, or talk about a contract",
+      "Lead mentions a complaint, legal issue, inspection dispute or a regulator",
+      "Lead asks a Fair Housing-sensitive question (who lives in an area, whether it is safe, schools)",
+      "Lead appears to already be under contract with another agent",
+      "Lead requests to opt out or be removed from contact"
+    ],
+    "requiredDisclosureFooter": ""
+  },
+
+  "bookingSequence": { "enabled": false },
+
+  "agents": {
+    "leadQualifier": { "enabled": true },
+    "followUp": { "enabled": true, "maxAttempts": 4, "cadenceDays": [1, 3, 7, 14] },
+    "appointmentSetter": { "enabled": true },
+    "contentDrafter": { "enabled": true }
+  }
+}
