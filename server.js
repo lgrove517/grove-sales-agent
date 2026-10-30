@@ -138,6 +138,8 @@ app.get('/health', (req, res) => {
     // The client's Webtech package and which agent features it turns on.
     package: (() => { try { return packages.packageFor(loadBrain(brand)); } catch { return null; } })(),
     features: (() => { try { return packages.featureStatus(loadBrain(brand)); } catch { return []; } })(),
+    // Sales-demo client (sample data, nothing is ever sent).
+    demo: (() => { try { return Boolean(loadBrain(brand).demo); } catch { return false; } })(),
   });
 });
 
@@ -347,7 +349,10 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
       // No tags here: on an existing contact GHL's upsert can REPLACE its
       // tags (Medicare, CD...). The inbound tag is added separately below.
     });
-    const ghlContactId = ghlResult.contact?.id || ghlResult.id || null;
+    // In DRY_RUN (no GHL credentials, e.g. the sales-demo client) every
+    // contact gets the same fake id - keeping it would make each new lead
+    // "supersede" the one before it, so it's dropped.
+    const ghlContactId = ghlResult.dryRun ? null : (ghlResult.contact?.id || ghlResult.id || null);
     if (ghlContactId) {
       db.setLeadGhlContactId(leadId, ghlContactId);
       db.supersedeOlderLeads(ghlContactId, leadId);
@@ -984,12 +989,66 @@ app.post('/api/leads/:id/test', requireAuth, (req, res) => {
   }
 });
 
+// --- Sales demo tools (only for brains marked "demo": true) --------------
+const demoData = require('./src/demo/demoData');
+
+// Put the demo client back to its sample leads, so each presentation starts clean.
+app.post('/api/demo/reset', requireAuth, (req, res) => {
+  try {
+    const brand = req.body.brand || req.query.brand;
+    const seeded = demoData.resetDemo(brand);
+    res.json({ ok: true, seeded });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Send one inquiry through the real lead pipeline, live, for the demo client.
+// Uses a ready-made inquiry, or the message the prospect types in.
+app.post('/api/demo/lead', requireAuth, async (req, res) => {
+  try {
+    const brand = req.body.brand || req.query.brand;
+    demoData.demoBrain(brand);
+    const sample = demoData.liveInquiry(brand);
+    const typed = String(req.body.message || '').trim();
+    const lead = {
+      brand,
+      firstName: typed ? (String(req.body.firstName || '').trim() || 'Demo') : sample.firstName,
+      lastName: typed ? (String(req.body.lastName || '').trim() || 'Prospect') : sample.lastName,
+      email: `live-demo-${Date.now()}@example.com`,
+      phone: '',
+      state: 'AL',
+      source: 'live_demo',
+      message: typed || sample.message,
+    };
+    const r = await fetch(`http://127.0.0.1:${PORT}/webhook/lead?brand=${encodeURIComponent(brand)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-agent-token': process.env.WEBHOOK_TOKEN || '' },
+      body: JSON.stringify(lead),
+    });
+    const data = await r.json().catch(() => ({}));
+    res.status(r.ok ? 200 : r.status).json({ ...data, inquiry: { name: `${lead.firstName} ${lead.lastName}`, message: lead.message } });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.get('/api/activity', requireAuth, (req, res) => {
   res.json({ events: db.listEvents({ limit: 50 }), commands: db.listCommands({ limit: 20 }) });
 });
 
 app.listen(PORT, () => {
   console.log(`Grove Sales Agent listening on http://localhost:${PORT}`);
+  // Load sample leads for any sales-demo client that has none yet.
+  try {
+    const fs = require('fs');
+    const { CONFIG_DIR } = require('./src/config/loadBrain');
+    const ids = fs.readdirSync(CONFIG_DIR).filter((f) => f.endsWith('.json') && !f.startsWith('brain.example')).map((f) => f.replace(/\.json$/, ''));
+    const seeded = demoData.seedEmptyDemos(ids);
+    if (seeded.length) console.log(`  Demo sample leads loaded for: ${seeded.join(', ')}`);
+  } catch (err) {
+    console.error('  Could not load demo sample leads:', err.message);
+  }
   console.log(`  Anthropic configured: ${Boolean(process.env.ANTHROPIC_API_KEY)}`);
   console.log(`  GHL configured: ${ghl.isConfigured()}`);
 
