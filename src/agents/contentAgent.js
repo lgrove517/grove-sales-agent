@@ -149,13 +149,33 @@ function parseDraftReply(text) {
   };
 }
 
-/** Reads one JSON string literal starting at the opening quote; null if it never closes. */
+/**
+ * Reads one JSON string literal starting at the opening quote; null if it
+ * never closes. Forgiving of the two mistakes models make inside drafts:
+ * a quotation left unescaped ("The biggest question we hear: "How much
+ * down?"") and a raw line break. A quote only ends the string when what
+ * follows is JSON punctuation (, ] } :) or the end of the text; any other
+ * quote is treated as part of the draft. Without this, a post with a quote
+ * in it was cut off at the quote and the rest of the drafts were lost.
+ */
 function readJsonString(s, start) {
+  let out = '"';
   for (let i = start + 1; i < s.length; i++) {
-    if (s[i] === '\\') { i++; continue; }
-    if (s[i] === '"') {
-      try { return { value: JSON.parse(s.slice(start, i + 1)), end: i + 1 }; } catch (_) { return null; }
+    const ch = s[i];
+    if (ch === '\\') { out += ch + (s[i + 1] || ''); i++; continue; }
+    if (ch === '\n') { out += '\\n'; continue; }
+    if (ch === '\r') { continue; }
+    if (ch === '\t') { out += '\\t'; continue; }
+    if (ch === '"') {
+      const rest = s.slice(i + 1).match(/^\s*(.)?/);
+      const next = rest && rest[1];
+      if (!next || ',]}:'.includes(next)) {
+        try { return { value: JSON.parse(out + '"'), end: i + 1 }; } catch (_) { return null; }
+      }
+      out += '\\"';
+      continue;
     }
+    out += ch;
   }
   return null;
 }
