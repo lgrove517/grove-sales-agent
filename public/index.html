@@ -195,6 +195,11 @@
   .btn.ghost { background: none; border: 1px solid rgba(0,56,64,0.3); color: var(--forest); }
   .btn:disabled { opacity: .6; cursor: default; }
   .btn.small { padding: 4px 10px; font-size: 13px; }
+  .demo-bar { border-left: 4px solid var(--gold); }
+  .demo-bar p { margin: 4px 0 10px; font-size: 14px; }
+  .demo-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .demo-row input { flex: 1 1 260px; min-width: 0; padding: 8px 10px; border: 1px solid rgba(0,56,64,0.3); border-radius: 8px; font: inherit; }
+  .demo-msg { margin-top: 8px; font-size: 14px; }
   .leads-note { font-size: 13px; margin: 8px 0 0; }
   .leads-note button { background: none; border: none; color: var(--forest); text-decoration: underline; cursor: pointer; font: inherit; padding: 0 0 0 6px; }
   .rec { background: #fff; border: 1px solid rgba(0,56,64,0.15); border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.5; }
@@ -231,6 +236,17 @@
 </header>
 
 <main>
+  <section class="card demo-bar" id="demo-bar" hidden>
+    <h2>Demo mode</h2>
+    <p>Sample company and made-up leads. The agent works live, but nothing is ever sent to anyone.</p>
+    <div class="demo-row">
+      <input id="demo-message" type="text" placeholder="Optional: type an inquiry, or leave blank for a ready-made one" autocomplete="off" />
+      <button type="button" class="btn" id="demo-lead">Send a live demo lead</button>
+      <button type="button" class="btn ghost" id="demo-reset">Reset demo</button>
+    </div>
+    <div class="demo-msg" id="demo-msg"></div>
+  </section>
+
   <section class="card briefing" id="briefing" hidden>
     <div class="b-head"><h2>Since your last visit</h2><span class="b-since" id="b-since"></span></div>
     <div class="b-summary" id="b-summary">Loading...</div>
@@ -327,11 +343,12 @@
       const res = await fetch('/health' + brandQuery());
       const data = await res.json();
       if (data.package) packageSelect.value = data.package.key;
+      document.getElementById('demo-bar').hidden = !data.demo;
       statusEl.innerHTML =
         '<span class="dot ' + (data.anthropicConfigured ? 'on' : 'off') + '"></span>Claude: ' +
         (data.anthropicConfigured ? 'live' : 'dry-run') +
         '  &nbsp; <span class="dot ' + (data.ghlConfigured ? 'on' : 'off') + '"></span>GoHighLevel: ' +
-        (data.ghlConfigured ? (data.ghlSendMode === 'live' ? 'live (sending)' : 'connected (review mode: drafts only, nothing is sent)') : 'dry-run') +
+        (data.demo ? 'demo (sample data, nothing is sent)' : data.ghlConfigured ? (data.ghlSendMode === 'live' ? 'live (sending)' : 'connected (review mode: drafts only, nothing is sent)') : 'dry-run') +
         (data.package ? '  &nbsp; Package: <b>' + escapeHtml(data.package.label) + '</b>' : '') +
         (data.workflows || []).map(function (w) {
           return '  &nbsp; <span class="dot ' + (w.enabled ? 'on' : 'off') + '"></span>' +
@@ -349,6 +366,53 @@
     }
     return false;
   }
+
+  // --- Demo mode (only shown for a demo client) ---
+  const demoMsg = document.getElementById('demo-msg');
+  document.getElementById('demo-lead').addEventListener('click', async function () {
+    const btn = this; const box = document.getElementById('demo-message');
+    btn.disabled = true; demoMsg.textContent = 'The agent is reading the inquiry...';
+    try {
+      const res = await fetch('/api/demo/lead', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ brand: currentBrand(), message: box.value }),
+      });
+      if (redirectIfSignedOut(res)) return;
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      demoMsg.textContent = 'New inquiry from ' + data.inquiry.name + ': "' + data.inquiry.message + '" - assessed. See it below.';
+      box.value = '';
+      const v = data.verdict || {};
+      const label = { qualified: 'Good fit - first reply drafted', needs_human: 'Needs you - handed to a person, no reply drafted', disqualified: 'Not a fit - no reply drafted' }[v.verdict] || (v.verdict || 'Assessed');
+      const draft = v.reply || v.draftForDrGrove || '';
+      addLogEntry('Live demo lead: ' + data.inquiry.name + ' - "' + data.inquiry.message + '"', {
+        intent: 'demo lead',
+        response: { drafts: draft ? [draft] : [], notes: label + (v.reason ? '. Why: ' + v.reason : '') + (draft && !v.reply ? ' (Draft held for review.)' : '') + ' Nothing was sent.' },
+      });
+    } catch (err) {
+      demoMsg.textContent = 'Could not run the demo lead: ' + (err.message || err);
+    }
+    btn.disabled = false;
+    refreshLeads(); refreshBriefing();
+  });
+  document.getElementById('demo-reset').addEventListener('click', async function () {
+    if (!confirm('Put the demo back to its sample leads? Live demo leads and typed instructions are cleared.')) return;
+    try {
+      const res = await fetch('/api/demo/reset', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ brand: currentBrand() }),
+      });
+      if (redirectIfSignedOut(res)) return;
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      demoMsg.textContent = 'Demo reset: ' + data.seeded + ' sample leads loaded.';
+      logEl.innerHTML = '';
+      try { sessionStorage.removeItem('briefingHidden:' + currentBrand()); } catch {}
+    } catch (err) {
+      demoMsg.textContent = 'Could not reset: ' + (err.message || err);
+    }
+    refreshStatus(); refreshLeads(); refreshBriefing();
+  });
 
   async function refreshLeads() {
     try {
