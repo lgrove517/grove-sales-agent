@@ -483,13 +483,19 @@
       },
       "medicare_new": {
         "firstYear": 640,
-        "renewalMonthly": 28,
-        "source": "Dr. Grove, Oct 31 2026: about $640 first year, $28/month renewals"
+        "renewalMonthly": 28.92,
+        "source": "Dr. Grove, Oct 31 2026: about $640 first year, $28/month renewals",
+        "sources": {
+          "renewalMonthly": "Carrier statements, Oct 2026 (UnitedHealthcare, HealthSpring): $28.92 a month per renewal"
+        }
       },
       "medicare_switch": {
         "firstYear": 289,
-        "renewalMonthly": 28,
-        "source": "Dr. Grove, Oct 31 2026: $289 first year, about $28/month renewals"
+        "renewalMonthly": 28.92,
+        "source": "Dr. Grove, Oct 31 2026: $289 first year, about $28/month renewals",
+        "sources": {
+          "renewalMonthly": "Carrier statements, Oct 2026 (UnitedHealthcare, HealthSpring): $28.92 a month per renewal"
+        }
       },
       "aum": {
         "payout": 0.7,
