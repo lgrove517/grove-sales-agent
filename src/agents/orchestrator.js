@@ -8,6 +8,8 @@ const { buildSocialCalendar } = require('./socialCalendar');
 const { buildMonthlyReport } = require('./monthlyReport');
 const { buildBookingReport, parseSpend } = require('./bookingReport');
 const { buildIncomePlan } = require('./incomePlan');
+const { buildAgencyPlan } = require('./agencyPlan');
+const { parseCases, setCases, buildReferralScorecard } = require('./referrals');
 const { renderScript, callerConfig } = require('../config/aiCaller');
 const { hasFeature, lockedMessage } = require('../config/packages');
 const { brainToSystemPrompt } = require('../config/loadBrain');
@@ -56,6 +58,13 @@ one of these intents and extract any parameters mentioned:
   leads do I need to make $10,000 a month?", "I want to earn 150k next year",
   "income plan $2M annuity premium at 6%", "$1M in AUM next quarter",
   "$25,000 from Medicare"
+- "agency_plan": they want a projection of a team of Medicare agents
+  referring clients to the advisor, e.g. "agency plan 6 agents, 250 cases
+  each", "what would 4 Medicare agents do for my AUM in 10 years?"
+- "referral_scorecard": they want the agency referral numbers per agent,
+  e.g. "referral scorecard", "which agents referred the most this year?"
+- "set_cases": they are recording how many Medicare cases an agent wrote,
+  e.g. "Marcus wrote 22 Medicare cases in November"
 - "set_spend": they are telling you how much they spent on ads or leads
   from a source, e.g. "spent $250 on Facebook in November"
 - "call_script": they want to see or review the AI phone call script,
@@ -67,7 +76,7 @@ one of these intents and extract any parameters mentioned:
 
 Output STRICT JSON only:
 {
-  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "booking_report" | "income_plan" | "set_spend" | "call_script" | "ask" | "unknown",
+  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "booking_report" | "income_plan" | "agency_plan" | "referral_scorecard" | "set_cases" | "set_spend" | "call_script" | "ask" | "unknown",
   "leadName": "name mentioned, if any, else empty string",
   "cleanedInstruction": "the instruction, lightly cleaned up, to hand to the specialist agent"
 }
@@ -77,6 +86,15 @@ Output STRICT JSON only:
  * command center still does something sensible without a live LLM call. */
 function ruleBasedRoute(instruction) {
   const lower = instruction.toLowerCase();
+  if (parseCases(instruction)) {
+    return { intent: 'set_cases', leadName: '', cleanedInstruction: instruction };
+  }
+  if (/(agency (plan|projection|model)|\b\d+\s+(medicare\s+)?agents\b[^.?!]*\b(aum|cases|years?)\b)/.test(lower)) {
+    return { intent: 'agency_plan', leadName: '', cleanedInstruction: instruction };
+  }
+  if (/(referral (scorecard|report|numbers|results)|agents? referr|referrals? (by|per) agent)/.test(lower)) {
+    return { intent: 'referral_scorecard', leadName: '', cleanedInstruction: instruction };
+  }
   if (/(income (plan|goal|target)|how many (leads|appointments|sales) (do|would|will) (i|we)|leads? (do|would) (i|we) need|\b(make|earn|reach|generate|gather|write|bring in)\b[^.?!]*\$?\d[\d,.]*\s*[km]?\b[^.?!]*\b(a|per|this|next) (year|month|quarter)\b)/.test(lower)) {
     return { intent: 'income_plan', leadName: '', cleanedInstruction: instruction };
   }
@@ -174,6 +192,24 @@ async function runCommand({ brain, instruction, since }) {
     }
     case 'booking_report': {
       response = buildBookingReport({ brain, instruction });
+      break;
+    }
+    case 'agency_plan': {
+      response = buildAgencyPlan({ brain, instruction });
+      break;
+    }
+    case 'referral_scorecard': {
+      response = buildReferralScorecard({ brain, instruction });
+      break;
+    }
+    case 'set_cases': {
+      const parsed = parseCases(instruction);
+      if (!parsed) {
+        response = { message: 'I could not read that. Try: "Marcus wrote 22 Medicare cases in November".' };
+      } else {
+        setCases({ brand: brain.clientId, ...parsed });
+        response = { message: `Saved: ${parsed.agent} wrote ${parsed.cases} Medicare cases in ${parsed.month}. The referral scorecard uses it for ${parsed.agent}'s referral rate.` };
+      }
       break;
     }
     case 'income_plan': {
@@ -275,7 +311,7 @@ async function runCommand({ brain, instruction, since }) {
         message:
           "I didn't recognize that as a command yet. Try things like " +
           '"what happened since my last visit?", "how can I get more appointments?", ' +
-          '"income plan $120,000", "draft 3 LinkedIn posts", "build the December social calendar", "monthly report", "follow up with Marcus", "list leads", or "run follow-up sweep".',
+          '"income plan $120,000", "agency plan 6 agents", "referral scorecard", "draft 3 LinkedIn posts", "build the December social calendar", "monthly report", "follow up with Marcus", "list leads", or "run follow-up sweep".',
       };
     }
   }

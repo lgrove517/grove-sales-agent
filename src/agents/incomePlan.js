@@ -360,4 +360,4 @@ function buildIncomePlan({ brain, instruction, now = new Date() }) {
   return { monthlyReport: true, incomePlan: true, month: 'Income plan', summary, sections, clientText, clientTextLabel: 'Copy-ready plan' };
 }
 
-module.exports = { buildIncomePlan, parseIncomeGoal, workBackward, lineMath, LINES, STARTING };
+module.exports = { buildIncomePlan, parseIncomeGoal, workBackward, lineMath, resolveLine, savedRates, saveRates, toAmount, LINES, STARTING };
