@@ -436,6 +436,17 @@ function agentReachedLead(leadId) {
   return !!db.prepare(`SELECT 1 FROM touches WHERE lead_id IN (${ids}) AND mode = 'live' LIMIT 1`).get({ leadId });
 }
 
+/** The referring agent if this contact was an agency referral in the last `days` days, else null. */
+function recentReferral(ghlContactId, days = 30) {
+  if (!ghlContactId) return null;
+  const since = toDbTime(Date.now() - days * 86400000);
+  const row = db.prepare(`
+    SELECT l.referred_by FROM leads l JOIN events e ON e.lead_id = l.id
+    WHERE l.ghl_contact_id = ? AND l.referred_by IS NOT NULL AND e.agent = 'referrals' AND e.action = 'referral' AND e.created_at >= ?
+    ORDER BY e.id DESC LIMIT 1`).get(ghlContactId, since);
+  return row ? row.referred_by : null;
+}
+
 function setSpend({ brand, month, source, amount }) {
   db.prepare(`
     INSERT INTO spend (brand, month, source, amount, updated_at) VALUES (?, ?, ?, ?, datetime('now'))
@@ -458,6 +469,7 @@ module.exports = {
   recordTouchEvent,
   creditBooking,
   agentReachedLead,
+  recentReferral,
   setSpend,
   spendFor,
   setLeadTest,
