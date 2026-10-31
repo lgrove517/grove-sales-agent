@@ -7,6 +7,7 @@ const { buildBriefing, recommend } = require('./briefing');
 const { buildSocialCalendar } = require('./socialCalendar');
 const { buildMonthlyReport } = require('./monthlyReport');
 const { buildBookingReport, parseSpend } = require('./bookingReport');
+const { buildIncomePlan } = require('./incomePlan');
 const { renderScript, callerConfig } = require('../config/aiCaller');
 const { hasFeature, lockedMessage } = require('../config/packages');
 const { brainToSystemPrompt } = require('../config/loadBrain');
@@ -50,6 +51,11 @@ one of these intents and extract any parameters mentioned:
 - "booking_report": they want the booking-sequence numbers: opens, clicks,
   booked appointments, cost per booked appointment, e.g. "booking report",
   "cost per appointment", "how is the booking sequence doing?"
+- "income_plan": they give an income goal and want to know how many leads,
+  appointments and sales it takes, e.g. "income plan $120,000", "how many
+  leads do I need to make $10,000 a month?", "I want to earn 150k next year",
+  "income plan $2M annuity premium at 6%", "$1M in AUM next quarter",
+  "$25,000 from Medicare"
 - "set_spend": they are telling you how much they spent on ads or leads
   from a source, e.g. "spent $250 on Facebook in November"
 - "call_script": they want to see or review the AI phone call script,
@@ -61,7 +67,7 @@ one of these intents and extract any parameters mentioned:
 
 Output STRICT JSON only:
 {
-  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "booking_report" | "set_spend" | "call_script" | "ask" | "unknown",
+  "intent": "social_calendar" | "draft_content" | "follow_up_lead" | "list_leads" | "list_activity" | "run_followup_sweep" | "briefing" | "recommendations" | "monthly_report" | "booking_report" | "income_plan" | "set_spend" | "call_script" | "ask" | "unknown",
   "leadName": "name mentioned, if any, else empty string",
   "cleanedInstruction": "the instruction, lightly cleaned up, to hand to the specialist agent"
 }
@@ -71,6 +77,9 @@ Output STRICT JSON only:
  * command center still does something sensible without a live LLM call. */
 function ruleBasedRoute(instruction) {
   const lower = instruction.toLowerCase();
+  if (/(income (plan|goal|target)|how many (leads|appointments|sales) (do|would|will) (i|we)|leads? (do|would) (i|we) need|\b(make|earn|reach|generate|gather|write|bring in)\b[^.?!]*\$?\d[\d,.]*\s*[km]?\b[^.?!]*\b(a|per|this|next) (year|month|quarter)\b)/.test(lower)) {
+    return { intent: 'income_plan', leadName: '', cleanedInstruction: instruction };
+  }
   if (/\b(spent|ad spend|ad budget|spend)\b/.test(lower) && /\d/.test(lower) && !/\breport\b/.test(lower)) {
     return { intent: 'set_spend', leadName: '', cleanedInstruction: instruction };
   }
@@ -167,6 +176,11 @@ async function runCommand({ brain, instruction, since }) {
       response = buildBookingReport({ brain, instruction });
       break;
     }
+    case 'income_plan': {
+      // Use the raw line: the numbers the owner typed matter more than the router's rewording.
+      response = buildIncomePlan({ brain, instruction });
+      break;
+    }
     case 'set_spend': {
       const parsed = parseSpend(instruction);
       if (!parsed) {
@@ -261,7 +275,7 @@ async function runCommand({ brain, instruction, since }) {
         message:
           "I didn't recognize that as a command yet. Try things like " +
           '"what happened since my last visit?", "how can I get more appointments?", ' +
-          '"draft 3 LinkedIn posts", "build the December social calendar", "monthly report", "follow up with Marcus", "list leads", or "run follow-up sweep".',
+          '"income plan $120,000", "draft 3 LinkedIn posts", "build the December social calendar", "monthly report", "follow up with Marcus", "list leads", or "run follow-up sweep".',
       };
     }
   }

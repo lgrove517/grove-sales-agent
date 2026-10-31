@@ -102,6 +102,12 @@ function buildBookingReport({ brain, instruction, now = new Date() }) {
     ['Booked after a call conversation', calledBooked],
   ] : [];
 
+  // Who earned this month's bookings (tagged by the booked-status webhook).
+  const credit = Object.fromEntries(all(`
+    SELECT e.action k, COUNT(DISTINCT e.lead_id) n FROM events e JOIN leads l ON l.id = e.lead_id
+    WHERE l.brand = ? AND e.agent = 'statusSync' AND e.action IN ('booked_by_agent','booked_by_you')
+      AND e.created_at >= ? AND e.created_at < ? AND l.is_test = 0 GROUP BY e.action`, brand, start, end).map((x) => [x.k, x.n]));
+
   const reviewNote = !sent.length && drafted.length;
   const sections = [
     { title: 'Leads', rows: [
@@ -120,6 +126,10 @@ function buildBookingReport({ brain, instruction, now = new Date() }) {
     { title: 'By step', rows: steps.map((s) => [`Day ${stepDays[s.step] ?? s.step}`, `${s.sent} sent · ${s.emails ? `${s.opened} opened · ` : ''}${s.clicked} clicked · ${s.booked} booked`]) },
     { title: 'Results', rows: [
       ['Booked appointments (sequence leads, this month)', bookedThisMonth],
+      ...(credit.booked_by_agent || credit.booked_by_you ? [
+        ['  earned by the agent (its emails, texts or call came first)', credit.booked_by_agent || 0],
+        ['  booked by you (seminar, your own call, referral)', credit.booked_by_you || 0],
+      ] : []),
       [`Of this month's ${started} started, booked so far`, `${cohortBooked} (${pct(cohortBooked, started)})`],
       ['  stopped - they replied', byStatus('stopped_replied')],
       ['  stopped - opted out', byStatus('stopped_opted_out')],
