@@ -465,5 +465,38 @@
       "Do you know your income number?"
     ],
     "notes": "Dr. Grove's preferred openers for retirement conversations (Oct 2026). Use them as questions that invite a conversation - never follow them with a product, investment, or plan-type pitch."
+  },
+  "incomePlan": {
+    "_comment": "Payouts for the income plan command (internal only - never shown to leads or sent to the AI). Commissions come from carriers; only advisory (AUM) income runs through Gradient. Fields left out use a labeled placeholder. Update when carrier schedules change.",
+    "lines": {
+      "life": {
+        "rate": 0.9,
+        "source": "Dr. Grove, Oct 31 2026: 90% of first-year annual premium, renewals rare"
+      },
+      "annuity": {
+        "rate": 0.06,
+        "source": "Dr. Grove, Oct 31 2026: about 5-7% of premium (midpoint)"
+      },
+      "ltc": {
+        "rate": 0.11,
+        "source": "Dr. Grove, Oct 31 2026: 11% of premium"
+      },
+      "medicare_new": {
+        "firstYear": 640,
+        "renewalMonthly": 28,
+        "source": "Dr. Grove, Oct 31 2026: about $640 first year, $28/month renewals"
+      },
+      "medicare_switch": {
+        "firstYear": 289,
+        "renewalMonthly": 28,
+        "source": "Dr. Grove, Oct 31 2026: $289 first year, about $28/month renewals"
+      },
+      "aum": {
+        "payout": 0.7,
+        "sources": {
+          "payout": "Gradient fee statement, Jan 2025: 70% payout"
+        }
+      }
+    }
   }
 }
