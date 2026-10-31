@@ -298,6 +298,15 @@ app.post('/webhook/lead', checkToken, async (req, res) => {
       console.log(`Skipped duplicate webhook for contact ${req.body.ghlContactId}`);
       return res.json({ skipped: 'duplicate', contactId: req.body.ghlContactId });
     }
+    // An agency referral is handled personally, never by the lead agent - even
+    // when the referral form also fires a general "new lead" workflow.
+    const referredBy = db.recentReferral(req.body.ghlContactId);
+    if (referredBy) {
+      await ghl.removeTags({ contactId: req.body.ghlContactId, tags: ['send-to-sales-agent'] }).catch(() => {});
+      db.logEvent({ agent: 'referrals', action: 'lead_skipped', detail: { contactId: req.body.ghlContactId, referredBy }, dryRun: false });
+      return res.json({ skipped: 'agency_referral', referredBy, contactId: req.body.ghlContactId });
+    }
+
     const brand = req.body.brand || req.query.brand;
     const brain = loadBrain(brand);
     const channel = req.body.phone ? 'SMS' : 'Email';
