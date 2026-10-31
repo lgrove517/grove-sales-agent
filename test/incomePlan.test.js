@@ -125,7 +125,7 @@ test('an annuity production goal converts to cases and commission', () => {
 test('Medicare counts enrollments and shows the renewals they add', () => {
   const r = buildIncomePlan({ brain: gfg, instruction: 'income plan $25,600 from new to Medicare' });
   assert.strictEqual(rowVal(r, 'Enrollments needed a year'), 40); // 25,600 / 640
-  assert.ok(/\$13,440 a year/.test(rowVal(r, '  renewals')), rowVal(r, '  renewals')); // 40 x $28 x 12
+  assert.ok(/\$13,882 a year/.test(rowVal(r, '  renewals')), rowVal(r, '  renewals')); // 40 x $28.92 x 12
 });
 
 test('an AUM goal stays in assets, shows the payout and never markets investments', () => {
