@@ -428,6 +428,12 @@ function creditBooking(leadId) {
   return t;
 }
 
+/** True when the agent actually sent this contact a message (live, not a draft). */
+function agentReachedLead(leadId) {
+  const ids = `SELECT id FROM leads WHERE id = @leadId OR (ghl_contact_id IS NOT NULL AND ghl_contact_id = (SELECT ghl_contact_id FROM leads WHERE id = @leadId))`;
+  return !!db.prepare(`SELECT 1 FROM touches WHERE lead_id IN (${ids}) AND mode = 'live' LIMIT 1`).get({ leadId });
+}
+
 function setSpend({ brand, month, source, amount }) {
   db.prepare(`
     INSERT INTO spend (brand, month, source, amount, updated_at) VALUES (?, ?, ?, ?, datetime('now'))
@@ -449,6 +455,7 @@ module.exports = {
   getTouch,
   recordTouchEvent,
   creditBooking,
+  agentReachedLead,
   setSpend,
   spendFor,
   setLeadTest,
