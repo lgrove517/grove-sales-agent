@@ -199,6 +199,8 @@ const DEFAULT_TAGS = {
   not_interested: 'sales-agent-not-interested',
   opted_out: 'sales-agent-opted-out',
   booked: 'sales-agent-booked',
+  booked_by_agent: 'sales-agent-booked-by-agent',
+  booked_by_you: 'sales-agent-booked-by-you',
   won: 'sales-agent-won',
   no_opt_in: 'sales-agent-no-opt-in',
 };
@@ -771,11 +773,17 @@ app.post('/webhook/status', checkToken, async (req, res) => {
     // Booking sequence: stop it, and give the booking to the message that earned it.
     if (lead.seq_status === 'active') db.updateLeadSequence(lead.id, { seqStatus: `stopped_${status}` });
     aiCaller.cancelCall(lead, status);
+    const statusTags = [tagFor(statusBrain, status)];
     if (status === 'booked') {
       db.updateLeadSequence(lead.id, { bookedAt: db.toDbTime(new Date()) });
       db.creditBooking(lead.id);
+      // Who earned it: the agent, if a message it actually sent or a call it
+      // completed came first; otherwise the owner (seminar, own call, referral).
+      const byAgent = db.agentReachedLead(lead.id) || lead.call_status === 'completed';
+      statusTags.push(tagFor(statusBrain, byAgent ? 'booked_by_agent' : 'booked_by_you'));
+      db.logEvent({ leadId: lead.id, agent: 'statusSync', action: byAgent ? 'booked_by_agent' : 'booked_by_you', detail: { contactId }, dryRun: false });
     }
-    await ghl.addTags({ contactId, tags: [tagFor(statusBrain, status)] }).catch((e) => console.error('Could not tag status:', e.message));
+    await ghl.addTags({ contactId, tags: statusTags }).catch((e) => console.error('Could not tag status:', e.message));
     await ghl.addNote({ contactId, body: `SALES AGENT: ${STATUS_SYNC[status].note}` }).catch((e) => console.error('Could not add status note:', e.message));
     res.json({ found: true, leadId: lead.id, status });
   } catch (err) {

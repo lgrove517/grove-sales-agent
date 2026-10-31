@@ -211,6 +211,37 @@ followed up automatically on a client with the sequence on. Re-tag them
 Tests: `node test/bookingSequence.test.js` (no keys needed; starts the
 server on a spare port and drives the webhooks).
 
+## Income plan and booking credit
+
+**`income plan $120,000`** works backward from an income goal: sales needed
+(average commission) -> appointments held (close rate) -> appointments booked
+(show rate) -> opted-in leads (booking rate), per month, week and workday,
+then compares that with the last 30 days. Add your own numbers in the same
+line ("with average commission $1,800, close rate 35%, show rate 75%, booking
+rate 20%"); they are saved per client and reused. Every rate says where it
+came from, and any starting assumption is labeled as one. Once 30+ opted-in
+leads exist from the last 90 days, the booking rate comes from the agent's own
+results automatically. No AI call, nothing sent. Open to every package. Test:
+`node test/incomePlan.test.js`.
+
+**By line of business.** Name the line and the plan uses that line's
+economics instead of an average commission: life insurance (% of annual
+premium), annuities and LTC (% of premium; the goal can be income or premium
+written: "income plan $2M annuity premium at 6%"), Medicare new-to-Medicare
+or plan change (flat first-year payout, plus the monthly renewals those
+clients add), AUM ("income plan $1M AUM next quarter": the goal stays in
+assets; it shows what they pay after fee and payout, and the break-even on
+fixed advisory costs), and planning fees. Each client's real payouts live in
+`incomePlan.lines` in its brain file (never shown to leads or sent to the AI);
+funnel rates typed for a line are saved for that line. An AUM plan is
+arithmetic only: the agent still never discusses investments with leads.
+
+**Who earned each booking.** When GHL reports a booking
+(`/webhook/status?status=booked`), the contact is also tagged
+`sales-agent-booked-by-agent` if a message the agent actually sent (not a
+review-mode draft) or a completed AI call came first, otherwise
+`sales-agent-booked-by-you`. The booking report shows both counts.
+
 ## Phase 2: AI caller (consented form leads only)
 
 One short AI phone call to a new opted-in lead, to hear their tone and intent
