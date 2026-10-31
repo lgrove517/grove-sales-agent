@@ -242,6 +242,40 @@ arithmetic only: the agent still never discusses investments with leads.
 review-mode draft) or a completed AI call came first, otherwise
 `sales-agent-booked-by-you`. The booking report shows both counts.
 
+## Agency plan and agency referrals (the Medicare front door)
+
+A team of Medicare agents meets thousands of people turning 65. The few who
+raise retirement income, a CD or an annuity are introduced to the advisor at
+a **separate** appointment. Three commands support that model:
+
+- **`agency plan 6 agents, 250 cases each`** projects it year by year: Medicare
+  cases -> introductions (referral rate) -> new advisory clients (close rate)
+  -> new assets (average account) -> the advisory book after market growth
+  and outflows -> what it pays (fee x payout), plus the Medicare renewal base.
+  Add any number in the same line ("10% referral rate, 30% close rate, average
+  account $175,000, starting AUM $100,000, 4% growth, outflows 5%, 15 years");
+  typed numbers are saved per client. Defaults come from `incomePlan.agency`
+  and `incomePlan.lines.aum` in the brain file; the rest are labeled
+  placeholders. It ends with the compliance rules: no product talk at a
+  Medicare appointment, no paid advisory referrals without Gradient approval.
+- **`Marcus wrote 22 Medicare cases in November`** records an agent's cases.
+- **`referral scorecard`** (or `... this year`, `... last month`) shows, per
+  agent: cases, clients referred (and the referral rate), booked, and became
+  clients.
+
+**Referral intake (`/webhook/referral`).** In GHL: an "Agency Referral" form
+(client name, phone/email, referring agent, what they asked about, and a
+consent line that the client agreed to be contacted), then a workflow
+"Sales Agent - Agency Referral": Form Submitted -> Webhook POST to
+`/webhook/referral?token=...&brand=grove-financial` with custom data
+`contact_id`, `referred_by`, `interest`. The agent records the referring
+agent, tags `sales-agent-agency-referral` + `sales-agent-needs-you`, adds a
+note, holds the booking sequence and cancels any scheduled AI call. **It never
+messages a referral** - you or your staff schedule the separate appointment
+personally. Bookings and wins flow in through `/webhook/status` as usual (a
+booking you make is credited `sales-agent-booked-by-you`). Test:
+`node test/agencyReferrals.test.js`.
+
 ## Phase 2: AI caller (consented form leads only)
 
 One short AI phone call to a new opted-in lead, to hear their tone and intent

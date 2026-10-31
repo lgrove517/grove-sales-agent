@@ -20,6 +20,7 @@ const { ensureSignOff } = require('./src/config/signOff');
 const seq = require('./src/config/bookingSequence');
 const { sendSequenceTouch } = require('./src/agents/sequenceTouch');
 const aiCaller = require('./src/agents/aiCallerAgent');
+const referrals = require('./src/agents/referrals');
 const {
   verifyCredentials,
   requireAuth,
@@ -201,6 +202,7 @@ const DEFAULT_TAGS = {
   booked: 'sales-agent-booked',
   booked_by_agent: 'sales-agent-booked-by-agent',
   booked_by_you: 'sales-agent-booked-by-you',
+  agency_referral: 'sales-agent-agency-referral',
   won: 'sales-agent-won',
   no_opt_in: 'sales-agent-no-opt-in',
 };
@@ -786,6 +788,44 @@ app.post('/webhook/status', checkToken, async (req, res) => {
     await ghl.addTags({ contactId, tags: statusTags }).catch((e) => console.error('Could not tag status:', e.message));
     await ghl.addNote({ contactId, body: `SALES AGENT: ${STATUS_SYNC[status].note}` }).catch((e) => console.error('Could not add status note:', e.message));
     res.json({ found: true, leadId: lead.id, status });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Agency referral -------------------------------------------------------
+// A Medicare agent's client asked about retirement income, a CD or an
+// annuity and agreed to meet the advisor. The agency referral form's GHL
+// workflow posts here: contact id (or name/phone/email), referred_by, interest.
+// The agent records who referred them and hands the contact to the owner.
+// It never messages a referral: the owner (or staff) schedules a separate
+// appointment personally.
+app.post('/webhook/referral', checkToken, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const cd = b.customData || b.custom_data || {};
+    const pick = (...vals) => vals.find((v) => v !== undefined && v !== null && String(v).trim() !== '');
+    const contactId = pick(cd.contactId, cd.contact_id, b.contactId, b.contact_id, b.contact && b.contact.id);
+    const referredBy = pick(cd.referred_by, cd.referring_agent, cd.agent, b.referred_by, b.referring_agent, b.agent);
+    if (!referredBy) return res.status(400).json({ error: 'no referring agent (referred_by) in the referral webhook' });
+    if (!contactId && !pick(b.phone, b.email, cd.phone, cd.email)) return res.status(400).json({ error: 'no contact id, phone or email in the referral webhook' });
+    if (isDuplicateRun(`referral:${contactId || pick(b.phone, b.email, cd.phone, cd.email)}`)) return res.json({ skipped: 'duplicate' });
+
+    const brain = brainForContact(contactId, b.brand || req.query.brand);
+    const interest = pick(cd.interest, cd.topic, b.interest, b.topic, b.message);
+    const result = referrals.recordReferral({
+      brain, contactId,
+      firstName: pick(b.first_name, b.firstName, cd.first_name), lastName: pick(b.last_name, b.lastName, cd.last_name),
+      email: pick(b.email, cd.email), phone: pick(b.phone, cd.phone), referredBy, interest,
+    });
+    aiCaller.cancelCall(result.lead, 'agency_referral');
+    if (contactId) {
+      await ghl.removeTags({ contactId, tags: ['send-to-sales-agent'] }).catch(() => {});
+      await ghl.addTags({ contactId, tags: [tagFor(brain, 'agency_referral'), tagFor(brain, 'needs_you')] }).catch((e) => console.error('Could not tag referral:', e.message));
+      await ghl.addNote({ contactId, body: `SALES AGENT: Agency referral from ${result.agent}${interest ? ` - asked about: ${interest}` : ''}. Schedule a separate appointment personally. No automated messages will be sent to this contact.` }).catch((e) => console.error('Could not add referral note:', e.message));
+    }
+    res.json({ leadId: result.leadId, created: result.created, referredBy: result.agent });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
