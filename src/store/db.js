@@ -97,6 +97,8 @@ for (const [col, type] of [
   ['call_due_at', 'TEXT'],
   ['call_last_at', 'TEXT'],
   ['call_tz', 'TEXT'],
+  // Agency referrals: the agent who introduced this person (see /webhook/referral).
+  ['referred_by', 'TEXT'],
 ]) {
   if (!leadColumns.includes(col)) db.exec(`ALTER TABLE leads ADD COLUMN ${col} ${type}`);
 }
