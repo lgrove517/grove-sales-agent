@@ -497,6 +497,12 @@
           "payout": "Gradient fee statement, Jan 2025: 70% payout"
         }
       }
+    },
+    "agency": {
+      "casesPerAgent": 250,
+      "sources": {
+        "casesPerAgent": "Dr. Grove, Oct 31 2026: Medicare agents in the model he saw wrote 200-300 cases a year each"
+      }
     }
   }
 }
