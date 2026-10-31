@@ -142,6 +142,16 @@ test('webhook: a referral is recorded, held for the owner and never messaged', a
   assert.ok(/referring agent/.test(bad.error));
 });
 
+test('webhook: a referral that also fires the new-lead workflow is not worked as a lead', async () => {
+  const r = await post('/webhook/lead', { contact_id: 'c-ref1', first_name: 'Cal', phone: '+12515550003', contact_source: 'form: Agency Referral', tags: 'send-to-sales-agent,referral' });
+  assert.strictEqual(r.skipped, 'agency_referral', JSON.stringify(r));
+  const lead = db.findLeadByGhlContactId('c-ref1');
+  assert.strictEqual(lead.referred_by, 'Marcus Lee');
+  assert.strictEqual(lead.seq_status, 'held');
+  const touches = db.db.prepare('SELECT COUNT(*) n FROM touches t JOIN leads l ON l.id = t.lead_id WHERE l.ghl_contact_id = ?').get('c-ref1').n;
+  assert.strictEqual(touches, 0);
+});
+
 test('webhook: the owner\'s booking of a referral counts as booked-by-you', async () => {
   const r = await post('/webhook/status?status=booked', { contact_id: 'c-ref1' });
   assert.strictEqual(r.status, 'booked');
