@@ -8,10 +8,6 @@
   "phone": "(251) 428-1814",
   "bookingLink": "https://api.leadconnectorhq.com/widget/bookings/1-1-ai-consultation-calendar",
 
-  "_todo": [
-    "_pricingReference: CPA/tax and medical/dental pricing"
-  ],
-
   "mailingAddress": {
     "value": "Webtech Design LLC, PO Box 180124, Mobile, AL 36618",
     "status": "Set Oct 25 2026 by Dr. Grove (PO Box) - appended to every Webtech marketing email for CAN-SPAM."
@@ -114,15 +110,13 @@
   ],
 
   "_pricingReference": {
-    "_note": "For Dr. Grove's reference only - NOT shown to the agents. Pricing is discussed on the call and in the proposal, never in automated messages.",
-    "realEstate": {
+    "_note": "For Dr. Grove's reference only - NOT shown to the agents. Pricing is discussed on the call and in the proposal, never in automated messages. The same Starter, Growth and Premium prices apply to every vertical (real estate, CPA/tax, medical/dental, chiropractic/veterinary, law, home services) and match the Stripe plans above.",
+    "allVerticals": {
       "Starter": { "setup": 750, "monthly": 297 },
       "Growth": { "setup": 1250, "monthly": 497 },
       "Premium": { "setup": 2000, "monthly": 797 },
       "recommendedStart": "90-day Starter pilot"
-    },
-    "cpaTax": "[ADD PRICING]",
-    "medicalDental": "[ADD PRICING]"
+    }
   },
 
   "valueProps": [
@@ -219,6 +213,30 @@
       "campaign": "webtech-booking-sequence"
     }
   },
+  "commands": {
+    "disabledIntents": ["agency_plan", "income_plan", "referral_scorecard", "set_cases"],
+    "disabledReply": "That command belongs to another business and is not available for Webtech Design. I can help with leads, appointments, follow-up, review requests, social content, and the monthly results report.",
+    "blocked": [
+      {
+        "pattern": "medicare|annuit|\\bIUL\\b|life insurance|retirement plan|income plan|agency plan|referral scorecard|\\bagents?\\b.*\\bcases\\b|recruit|\\bAEP\\b|\\bSOA\\b",
+        "reply": "That is outside what I handle for Webtech Design. I can help with leads, appointments, follow-up, review requests, social content, and the monthly results report."
+      }
+    ]
+  },
+
+  "suggestions": [
+    "what happened since my last visit?",
+    "how can I get more appointments?",
+    "monthly report",
+    "follow up with a new lead",
+    "draft an email offering a free 20-minute systems review",
+    "draft 3 LinkedIn posts for real estate agents",
+    "build the December social calendar",
+    "draft a review request for a past client",
+    "list leads",
+    "list activity"
+  ],
+
   "agents": {
     "leadQualifier": { "enabled": true },
     "followUp": { "enabled": true, "maxAttempts": 4, "cadenceDays": [1, 3, 7, 14] },
