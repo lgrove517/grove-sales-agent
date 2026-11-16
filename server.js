@@ -31,6 +31,18 @@ const {
 
 const app = express();
 
+// A dedicated deployment (ALLOWED_BRAINS=vcf) defaults to its own brain.
+const DEFAULT_BRAIN_ID = process.env.DEFAULT_BRAIN || String(process.env.ALLOWED_BRAINS || '').split(',')[0].trim() || 'grove-financial';
+
+// Per-client command blocklist (brain.commands.blocked in config/<id>.json).
+function blockedCommand(brain, instruction) {
+  const rules = (brain.commands && brain.commands.blocked) || [];
+  for (const r of rules) {
+    try { if (new RegExp(r.pattern, 'i').test(instruction)) return r.reply || 'That is outside what this assistant handles.'; } catch { /* ignore bad pattern */ }
+  }
+  return null;
+}
+
 // Needed when deployed behind a reverse proxy (Render/Railway/etc.) so
 // secure cookies and req.ip (used for login rate-limiting) work correctly.
 if (process.env.TRUST_PROXY || process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
@@ -131,8 +143,8 @@ app.get('/health', (req, res) => {
     anthropicConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
     ghlConfigured: ghl.isConfigured(),
     ghlSendMode: ghl.sendMode(),
-    defaultBrain: process.env.DEFAULT_BRAIN || 'grove-financial',
-    brand: brand || process.env.DEFAULT_BRAIN || 'grove-financial',
+    defaultBrain: DEFAULT_BRAIN_ID,
+    brand: brand || DEFAULT_BRAIN_ID,
     clientName: (() => { try { return loadBrain(brand).businessName; } catch { return null; } })(),
     // Compliance-gated workflows and whether each is switched on.
     workflows: (() => { try { return loadBrain(brand).workflowStatus || []; } catch { return []; } })(),
@@ -919,6 +931,8 @@ app.post('/command', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'instruction is required' });
     }
     const brain = loadBrain(brand);
+    const blocked = blockedCommand(brain, instruction);
+    if (blocked) return res.json({ intent: 'out_of_scope', dryRun: false, response: { message: blocked } });
     const result = await runCommand({ brain, instruction, since: briefingSince(req, brain.clientId) });
     res.json(result);
   } catch (err) {
@@ -992,7 +1006,7 @@ app.get('/api/brains', requireAuth, (req, res) => {
       } catch { return null; }
     })
     .filter(Boolean);
-  res.json({ brains, defaultBrain: process.env.DEFAULT_BRAIN || 'grove-financial' });
+  res.json({ brains, defaultBrain: DEFAULT_BRAIN_ID });
 });
 
 // Set a client's package by hand from the dashboard (Stripe sets it too).
@@ -1024,6 +1038,12 @@ app.post('/api/spend', requireAuth, (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Per-client "Try:" suggestions (brain.suggestions). null = page keeps its default line.
+app.get('/api/suggestions', requireAuth, (req, res) => {
+  try { res.json({ suggestions: loadBrain(req.query.brand).suggestions || null }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/leads', requireAuth, (req, res) => {
@@ -1091,7 +1111,7 @@ app.post('/api/demo/lead', requireAuth, async (req, res) => {
 });
 
 app.get('/api/activity', requireAuth, (req, res) => {
-  res.json({ events: db.listEvents({ limit: 50 }), commands: db.listCommands({ limit: 20 }) });
+  res.json({ events: db.listEvents({ brand: req.query.brand, limit: 50 }), commands: db.listCommands({ brand: req.query.brand, limit: 20 }) });
 });
 
 app.listen(PORT, () => {
