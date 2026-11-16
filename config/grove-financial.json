@@ -360,15 +360,53 @@
     "landingPageUrl": "https://api.leadconnectorhq.com/widget/bookings/compliementary-financial-planning",
     "firstTouchChannel": "Email",
     "steps": [
-      { "day": 1, "channel": "Email" },
-      { "day": 3, "channel": "SMS" },
-      { "day": 7, "channel": "Email" }
+      {
+        "day": 1,
+        "channel": "Email"
+      },
+      {
+        "day": 3,
+        "channel": "SMS"
+      },
+      {
+        "day": 7,
+        "channel": "Email"
+      }
     ],
-    "optInSourcePatterns": ["form", "survey", "retireflo", "referral", "seminar", "landing"],
-    "optInTags": ["opt-in", "requested-info", "referral", "retireflo"],
-    "smsConsentTags": ["sms-opt-in"],
-    "sendWindow": { "timezone": "America/Chicago", "startHour": 9, "endHour": 19, "days": [1, 2, 3, 4, 5, 6] },
-    "utm": { "source": "sales-agent", "campaign": "gfg-booking-sequence" }
+    "optInSourcePatterns": [
+      "form",
+      "survey",
+      "retireflo",
+      "referral",
+      "seminar",
+      "landing"
+    ],
+    "optInTags": [
+      "opt-in",
+      "requested-info",
+      "referral",
+      "retireflo"
+    ],
+    "smsConsentTags": [
+      "sms-opt-in"
+    ],
+    "sendWindow": {
+      "timezone": "America/Chicago",
+      "startHour": 9,
+      "endHour": 19,
+      "days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "utm": {
+      "source": "sales-agent",
+      "campaign": "gfg-booking-sequence"
+    }
   },
   "aiCaller": {
     "_comment": "Phase 2 (Oct 25 2026, Dr. Grove): one short AI phone call to new opted-in leads with DOCUMENTED CALL CONSENT (form checkbox -> tag ai-call-consent), to hear their tone and intent and offer a free conversation with Leon. Calls only 10 AM - 6 PM Monday - Friday in the lead's own time zone (a 2 AM form is called at the next window). Small volume to start: 5 calls per 24 hours, 2 tries per lead, leads no older than 3 days. Medicare leads are NOT called by the AI - Leon calls them (CMS recording and first-minute disclaimer rules). Stays OFF until Dr. Grove has reviewed this script, pasted it into the GHL Voice AI agent, and set AI_CALLER_APPROVED=true on Railway. Type 'show call script' in the command center to review it. No voicemail in Phase 2 - set the GHL agent to hang up on voicemail.",
@@ -424,8 +462,6 @@
     "how can I get more appointments?",
     "monthly report",
     "income plan $120,000",
-    "agency plan 6 agents, 250 cases each",
-    "referral scorecard",
     "draft an email about Medicare planning",
     "draft a follow-up about IUL",
     "draft a follow-up about annuities",
@@ -433,7 +469,6 @@
     "list leads",
     "list activity"
   ],
-
   "agents": {
     "leadQualifier": {
       "enabled": true
@@ -525,5 +560,19 @@
         "casesPerAgent": "Dr. Grove, Oct 31 2026: Medicare agents in the model he saw wrote 200-300 cases a year each"
       }
     }
+  },
+  "commands": {
+    "disabledIntents": [
+      "agency_plan",
+      "referral_scorecard",
+      "set_cases"
+    ],
+    "disabledReply": "The agency tools (agency plan, referral scorecard and Medicare case counts) are on the Grove Financial Group - Agency page. Here I can help with client follow-up, income planning, and drafts for Medicare, IUL, annuities and long-term care.",
+    "blocked": [
+      {
+        "pattern": "\\bagency plan\\b|referral scorecard|\\bagents?\\b.*\\bcases\\b",
+        "reply": "The agency tools (agency plan, referral scorecard and Medicare case counts) are on the Grove Financial Group - Agency page. Here I can help with client follow-up, income planning, and drafts for Medicare, IUL, annuities and long-term care."
+      }
+    ]
   }
 }

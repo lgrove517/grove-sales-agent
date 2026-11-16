@@ -255,16 +255,17 @@
     ]
   },
   "commands": {
-    "disabledIntents": ["income_plan", "agency_plan"],
-    "disabledReply": "That planning tool belongs on the Grove Financial Group client page, not the Agency page. Here I can help with agent recruiting, CPA and attorney partners, veteran career conversations, and the referral scorecard.",
+    "disabledIntents": [
+      "income_plan"
+    ],
+    "disabledReply": "That income planning tool is on the Grove Financial Group client page. Here I can help with the agency plan, the referral scorecard, agent recruiting, CPA and attorney partners, and veteran career conversations.",
     "blocked": [
       {
-        "pattern": "^\\s*income plan\\b|\\bagency plan\\b|\\bAUM\\b|assets under management",
-        "reply": "That planning tool belongs on the Grove Financial Group client page, not the Agency page. Here I can help with agent recruiting, CPA and attorney partners, veteran career conversations, and the referral scorecard."
+        "pattern": "^\\s*income plan\\b",
+        "reply": "That income planning tool is on the Grove Financial Group client page. Here I can help with the agency plan, the referral scorecard, agent recruiting, CPA and attorney partners, and veteran career conversations."
       }
     ]
   },
-
   "suggestions": [
     "what happened since my last visit?",
     "how can I get more appointments?",
@@ -274,12 +275,12 @@
     "draft a note to an estate planning attorney",
     "draft a veteran career conversation invitation",
     "draft 3 LinkedIn posts for insurance agents",
+    "agency plan 6 agents, 250 cases each",
     "referral scorecard",
     "Marcus wrote 22 Medicare cases in November",
     "list leads",
     "list activity"
   ],
-
   "agents": {
     "leadQualifier": {
       "enabled": true
@@ -327,5 +328,50 @@
       ]
     }
   ],
-  "bookingQr": "https://link.sendlink.co/qr/ck1N2YG-C1H-"
+  "bookingQr": "https://link.sendlink.co/qr/ck1N2YG-C1H-",
+  "incomePlan": {
+    "_comment": "Copy of grove-financial.json incomePlan so the agency plan on THIS page uses the same payout and cases-per-agent numbers. Internal only, never shown to leads. If you change it in one brain, change it in the other.",
+    "lines": {
+      "life": {
+        "rate": 0.9,
+        "source": "Dr. Grove, Oct 31 2026: 90% of first-year annual premium, renewals rare"
+      },
+      "annuity": {
+        "rate": 0.06,
+        "source": "Dr. Grove, Oct 31 2026: about 5-7% of premium (midpoint)"
+      },
+      "ltc": {
+        "rate": 0.11,
+        "source": "Dr. Grove, Oct 31 2026: 11% of premium"
+      },
+      "medicare_new": {
+        "firstYear": 640,
+        "renewalMonthly": 28.92,
+        "source": "Dr. Grove, Oct 31 2026: about $640 first year, $28/month renewals",
+        "sources": {
+          "renewalMonthly": "Carrier statements, Oct 2026 (UnitedHealthcare, HealthSpring): $28.92 a month per renewal"
+        }
+      },
+      "medicare_switch": {
+        "firstYear": 289,
+        "renewalMonthly": 28.92,
+        "source": "Dr. Grove, Oct 31 2026: $289 first year, about $28/month renewals",
+        "sources": {
+          "renewalMonthly": "Carrier statements, Oct 2026 (UnitedHealthcare, HealthSpring): $28.92 a month per renewal"
+        }
+      },
+      "aum": {
+        "payout": 0.7,
+        "sources": {
+          "payout": "Gradient fee statement, Jan 2025: 70% payout"
+        }
+      }
+    },
+    "agency": {
+      "casesPerAgent": 250,
+      "sources": {
+        "casesPerAgent": "Dr. Grove, Oct 31 2026: Medicare agents in the model he saw wrote 200-300 cases a year each"
+      }
+    }
+  }
 }
