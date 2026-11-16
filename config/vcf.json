@@ -187,6 +187,24 @@
     ]
   },
 
+  "commands": {
+    "blocked": [
+      { "pattern": "agency plan|income plan|referral scorecard|\\bagents?\\b.*\\bcases\\b|recruit|production|medicare|annuit|advisory|\\bIUL\\b|commission", "reply": "That is outside what I handle for Village Covenant Foundation. I can help with giving, Legacy Conversations, the monthly impact letter, and follow-up with supporters." }
+    ]
+  },
+
+  "suggestions": [
+    "what happened since my last visit?",
+    "draft a thank-you for a new gift",
+    "draft the monthly impact letter",
+    "monthly giving report",
+    "follow up with someone who gave last year",
+    "plan the year-end appeal",
+    "draft an invitation to the next Legacy Giving Briefing",
+    "list leads",
+    "list activity"
+  ],
+
   "agents": {
     "leadQualifier": { "enabled": true },
     "followUp": { "enabled": false, "_note": "Nurture sequences (KB C3) run as GHL workflows, not automated agent follow-ups." },
