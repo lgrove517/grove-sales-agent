@@ -188,6 +188,8 @@
   },
 
   "commands": {
+    "disabledIntents": ["agency_plan", "income_plan", "referral_scorecard", "set_cases", "booking_report", "call_script"],
+    "disabledReply": "That command belongs to another business and is not available for Village Covenant Foundation. I can help with giving, Legacy Conversations, the monthly impact letter, and follow-up with supporters.",
     "blocked": [
       { "pattern": "agency plan|income plan|referral scorecard|\\bagents?\\b.*\\bcases\\b|recruit|production|medicare|annuit|advisory|\\bIUL\\b|commission", "reply": "That is outside what I handle for Village Covenant Foundation. I can help with giving, Legacy Conversations, the monthly impact letter, and follow-up with supporters." }
     ]
