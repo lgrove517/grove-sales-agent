@@ -8,10 +8,6 @@
   "phone": "(251) 428-1814",
   "bookingLink": "https://api.leadconnectorhq.com/widget/bookings/1-1-ai-consultation-calendar",
 
-  "_todo": [
-    "_pricingReference: CPA/tax and medical/dental pricing"
-  ],
-
   "mailingAddress": {
     "value": "Webtech Design LLC, PO Box 180124, Mobile, AL 36618",
     "status": "Set Oct 25 2026 by Dr. Grove (PO Box) - appended to every Webtech marketing email for CAN-SPAM."
@@ -114,15 +110,13 @@
   ],
 
   "_pricingReference": {
-    "_note": "For Dr. Grove's reference only - NOT shown to the agents. Pricing is discussed on the call and in the proposal, never in automated messages.",
-    "realEstate": {
+    "_note": "For Dr. Grove's reference only - NOT shown to the agents. Pricing is discussed on the call and in the proposal, never in automated messages. The same Starter, Growth and Premium prices apply to every vertical (real estate, CPA/tax, medical/dental, chiropractic/veterinary, law, home services) and match the Stripe plans above.",
+    "allVerticals": {
       "Starter": { "setup": 750, "monthly": 297 },
       "Growth": { "setup": 1250, "monthly": 497 },
       "Premium": { "setup": 2000, "monthly": 797 },
       "recommendedStart": "90-day Starter pilot"
-    },
-    "cpaTax": "[ADD PRICING]",
-    "medicalDental": "[ADD PRICING]"
+    }
   },
 
   "valueProps": [
