@@ -166,6 +166,15 @@ async function runCommand({ brain, instruction, since }) {
   const routed = await classifyIntent(instruction);
   let response;
 
+  // A client's brain can switch off commands that belong to another business
+  // (brain.commands.disabledIntents), e.g. the agency and income tools for a nonprofit.
+  const disabled = (brain.commands && brain.commands.disabledIntents) || [];
+  if (disabled.includes(routed.intent)) {
+    response = { message: (brain.commands && brain.commands.disabledReply) || `That command is not available for ${brain.businessName}.` };
+    db.logCommand({ brand: brain.clientId, instruction, response });
+    return { intent: 'out_of_scope', dryRun: routed.dryRun, response };
+  }
+
   // Package check before any AI call: a locked command does nothing.
   const feature = INTENT_FEATURE[routed.intent];
   if (feature && !hasFeature(brain, feature)) {
@@ -271,7 +280,7 @@ async function runCommand({ brain, instruction, since }) {
       // Attach each event's lead name and parse its detail, so the command
       // center can show readable cards instead of raw JSON.
       response = {
-        events: db.listEvents({ limit: 20 }).map((e) => {
+        events: db.listEvents({ brand: brain.clientId, limit: 20 }).map((e) => {
           const lead = e.lead_id ? db.getLead(e.lead_id) : null;
           let detail = e.detail;
           try { detail = JSON.parse(e.detail); } catch {}
@@ -307,12 +316,10 @@ async function runCommand({ brain, instruction, since }) {
     }
     // falls through when no AI is configured
     default: {
-      response = {
-        message:
-          "I didn't recognize that as a command yet. Try things like " +
-          '"what happened since my last visit?", "how can I get more appointments?", ' +
-          '"income plan $120,000", "agency plan 6 agents", "referral scorecard", "draft 3 LinkedIn posts", "build the December social calendar", "monthly report", "follow up with Marcus", "list leads", or "run follow-up sweep".',
-      };
+      const own = Array.isArray(brain.suggestions) && brain.suggestions.length
+        ? brain.suggestions.map((x) => `"${x}"`).join(', ')
+        : '"what happened since my last visit?", "how can I get more appointments?", "income plan $120,000", "agency plan 6 agents", "referral scorecard", "draft 3 LinkedIn posts", "build the December social calendar", "monthly report", "follow up with Marcus", "list leads", or "run follow-up sweep"';
+      response = { message: "I didn't recognize that as a command yet. Try things like " + own + '.' };
     }
   }
 
