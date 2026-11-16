@@ -267,7 +267,7 @@
       <input id="cmd-input" type="text" placeholder='e.g. "build the December social calendar" or "draft 3 LinkedIn posts"' autocomplete="off" />
       <button type="submit">Send</button>
     </form>
-    <div class="hint">Try: "what happened since my last visit?" &middot; "how can I get more appointments?" &middot; "monthly report" &middot; "income plan $120,000" &middot; "agency plan 6 agents, 250 cases each" &middot; "referral scorecard" &middot; "list leads" &middot; "list activity" &middot; "follow up with Marcus" &middot; "draft an email about Medicare planning"</div>
+    <div class="hint" id="hint">Try: "what happened since my last visit?" &middot; "how can I get more appointments?" &middot; "monthly report" &middot; "income plan $120,000" &middot; "agency plan 6 agents, 250 cases each" &middot; "referral scorecard" &middot; "list leads" &middot; "list activity" &middot; "follow up with Marcus" &middot; "draft an email about Medicare planning"</div>
     <div class="log" id="log"></div>
   </section>
 
@@ -290,6 +290,31 @@
   const input = document.getElementById('cmd-input');
   const brandSelect = document.getElementById('brand-select');
   const packageSelect = document.getElementById('package-select');
+
+  // "Try:" suggestions come from the selected client's brain, so one client
+  // never sees another business's example commands.
+  const hintEl = document.getElementById('hint');
+  const defaultHint = hintEl.innerHTML;
+  const safeHint = 'Try: "what happened since my last visit?" &middot; "list leads" &middot; "list activity"';
+  async function loadSuggestions() {
+    try {
+      const res = await fetch('/api/suggestions' + brandQuery());
+      if (redirectIfSignedOut(res)) return;
+      const data = await res.json();
+      if (Array.isArray(data.suggestions) && data.suggestions.length) {
+        hintEl.innerHTML = 'Try: ' + data.suggestions.map(function (s) {
+          return '<a href="#" data-sugg="' + escapeHtml(s) + '" style="color:inherit">"' + escapeHtml(s) + '"</a>';
+        }).join(' &middot; ');
+        hintEl.querySelectorAll('a[data-sugg]').forEach(function (a) {
+          a.addEventListener('click', function (e) { e.preventDefault(); input.value = a.getAttribute('data-sugg'); input.focus(); });
+        });
+      } else if (data.suggestions === null) {
+        hintEl.innerHTML = defaultHint;
+      } else {
+        hintEl.innerHTML = safeHint;
+      }
+    } catch { hintEl.innerHTML = safeHint; }
+  }
 
   // Which client the command center is working for. Remembered per browser.
   function currentBrand() { return brandSelect.value || ''; }
@@ -333,6 +358,8 @@
 
   brandSelect.addEventListener('change', function () {
     try { localStorage.setItem('salesAgentBrand', currentBrand()); } catch {}
+    logEl.innerHTML = ''; // never carry one client's answers into another client's view
+    loadSuggestions();
     refreshStatus();
     refreshLeads();
     refreshBriefing();
@@ -718,6 +745,7 @@
   });
 
   loadBrains().then(function () {
+    loadSuggestions();
     refreshStatus();
     refreshLeads();
     refreshBriefing();
