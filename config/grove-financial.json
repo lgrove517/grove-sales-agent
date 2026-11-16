@@ -419,6 +419,21 @@
       "voicemail": "Do not leave a voicemail in Phase 2 - hang up and the agent will try once more on another day."
     }
   },
+  "suggestions": [
+    "what happened since my last visit?",
+    "how can I get more appointments?",
+    "monthly report",
+    "income plan $120,000",
+    "agency plan 6 agents, 250 cases each",
+    "referral scorecard",
+    "draft an email about Medicare planning",
+    "draft a follow-up about IUL",
+    "draft a follow-up about annuities",
+    "draft a long-term care seminar invitation",
+    "list leads",
+    "list activity"
+  ],
+
   "agents": {
     "leadQualifier": {
       "enabled": true

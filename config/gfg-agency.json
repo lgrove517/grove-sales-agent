@@ -254,6 +254,32 @@
       "What real mentorship looks like for a newer agent"
     ]
   },
+  "commands": {
+    "disabledIntents": ["income_plan", "agency_plan"],
+    "disabledReply": "That planning tool belongs on the Grove Financial Group client page, not the Agency page. Here I can help with agent recruiting, CPA and attorney partners, veteran career conversations, and the referral scorecard.",
+    "blocked": [
+      {
+        "pattern": "^\\s*income plan\\b|\\bagency plan\\b|\\bAUM\\b|assets under management",
+        "reply": "That planning tool belongs on the Grove Financial Group client page, not the Agency page. Here I can help with agent recruiting, CPA and attorney partners, veteran career conversations, and the referral scorecard."
+      }
+    ]
+  },
+
+  "suggestions": [
+    "what happened since my last visit?",
+    "how can I get more appointments?",
+    "draft an invitation to an Agent Discovery Call",
+    "draft a follow-up for a licensed Medicare agent",
+    "draft a message to a CPA about a referral partnership",
+    "draft a note to an estate planning attorney",
+    "draft a veteran career conversation invitation",
+    "draft 3 LinkedIn posts for insurance agents",
+    "referral scorecard",
+    "Marcus wrote 22 Medicare cases in November",
+    "list leads",
+    "list activity"
+  ],
+
   "agents": {
     "leadQualifier": {
       "enabled": true
