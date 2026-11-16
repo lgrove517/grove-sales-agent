@@ -238,7 +238,13 @@ function logEvent({ leadId, agent, action, detail, dryRun }) {
   `).run(leadId || null, agent, action, typeof detail === 'string' ? detail : JSON.stringify(detail), dryRun ? 1 : 0);
 }
 
-function listEvents({ leadId, limit = 100 } = {}) {
+function listEvents({ leadId, brand, limit = 100 } = {}) {
+  // With a brand, only events tied to that client's leads (lead-less events carry no brand).
+  if (brand && !leadId) {
+    return db
+      .prepare(`SELECT e.* FROM events e JOIN leads l ON l.id = e.lead_id WHERE l.brand = ? ORDER BY e.created_at DESC LIMIT ?`)
+      .all(brand, limit);
+  }
   if (leadId) {
     return db
       .prepare(`SELECT * FROM events WHERE lead_id = ? ORDER BY created_at DESC LIMIT ?`)
@@ -254,7 +260,8 @@ function logCommand({ brand, instruction, response }) {
   `).run(brand, instruction, typeof response === 'string' ? response : JSON.stringify(response));
 }
 
-function listCommands({ limit = 50 } = {}) {
+function listCommands({ brand, limit = 50 } = {}) {
+  if (brand) return db.prepare(`SELECT * FROM commands WHERE brand = ? ORDER BY created_at DESC LIMIT ?`).all(brand, limit);
   return db.prepare(`SELECT * FROM commands ORDER BY created_at DESC LIMIT ?`).all(limit);
 }
 
